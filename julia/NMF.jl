@@ -1,5 +1,5 @@
 
-module NMD
+module NMF
 
 """
 Variational Inference for Bayesian NMF
@@ -15,15 +15,15 @@ p(H) = Gam(H_m,n | a_H, b_H)
 using LinearAlgebra
 using Distributions
 
-export NMF
+export NMFModel
 
-struct NMF
+struct NMFModel
     D::Int
     M::Int
     N::Int
     a_w::Array{Float64, 2}  # D*M
-    b_w::Array{Float64, 1}  # M
     a_h::Array{Float64, 2}  # M*N
+    b_w::Array{Float64, 1}  # M
     b_h::Array{Float64, 1}  # M
 end
 
@@ -41,7 +41,7 @@ end
 # Functions
 # -----------------------------------------------------------
 
-function sample_data(model::NMF, N::Int)
+function sample_data(N::Int, model::NMFModel)
     """
     Sample parameters and data
     """
@@ -80,4 +80,6 @@ function sample_data(model::NMF, N::Int)
     # Sample X
     X = sqsum(S, 2)
     return X, S, W, H
+end
+
 end
