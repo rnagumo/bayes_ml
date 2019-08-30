@@ -14,6 +14,8 @@ p(H) = Gam(H_m,n | a_H, b_H)
 
 using LinearAlgebra
 using Distributions
+using StatsFuns
+using SpecialFunctions
 
 export NMFModel
 
@@ -22,8 +24,8 @@ struct NMFModel
     M::Int
     N::Int
     a_w::Array{Float64, 2}  # D*M
-    a_h::Array{Float64, 2}  # M*N
     b_w::Array{Float64, 1}  # M
+    a_h::Array{Float64, 2}  # M*N
     b_h::Array{Float64, 1}  # M
 end
 
@@ -79,7 +81,94 @@ function sample_data(N::Int, model::NMFModel)
 
     # Sample X
     X = sqsum(S, 2)
+
     return X, S, W, H
+end
+
+function init_latent_variable(X::Array{Float64, 2}, prior::NMFModel)
+    # Dimension
+    D = prior.D
+    M = prior.M
+    N = prior.N
+
+    S = zeros(D, M, N)
+    for d in 1:D
+        for m in 1:M
+            for n in 1:N
+                S[d, m, n] = (X[d, n] * prior.a_w[d, m] / prior.b_w[m]
+                              * prior.a_h[m, n] / prior.b_h[m])
+            end
+        end
+    end
+
+    return S
+end
+
+function update_S(X, prior::NMFModel)
+    # Dimension
+    D = prior.D
+    M = prior.M
+    N = prior.N
+
+    # Latent variable
+    S = zeros(D, M, N)
+    for d in 1:D
+        for n in 1:N
+            ln_p = (digamma.(prior.a_w[d, :]) - log.(prior.b_w) 
+                    + digamma.(prior.a_h[:, n]) - log.(prior.b_h))
+            ln_p .-= logsumexp(ln_p)
+            S[d, :, n] = X[d, n] .+ exp.(ln_p)
+        end
+    end
+
+    return S
+end
+
+function update_W(S::Array{Float64, 3}, prior::NMFModel, posterior::NMFModel)
+    # Dimension
+    D = prior.D
+    M = prior.M
+    N = prior.N
+
+    # Update
+    a_w = prior.a_w + sqsum(S, 3)
+    b_w = prior.b_w + sqsum(posterior.a_h, 2) .* posterior.b_h
+
+    return NMFModel(D, M, N, a_w, b_w, posterior.a_h, posterior.b_h)
+end
+
+function update_H(S::Array{Float64, 3}, prior::NMFModel, posterior::NMFModel)
+    # Dimension
+    D = prior.D
+    M = prior.M
+    N = prior.N
+
+    # Update
+    a_h = prior.a_h + sqsum(S, 1)
+    b_h = prior.b_h + sqsum(posterior.a_w, 1) .* posterior.b_w
+
+    return NMFModel(D, M, N, posterior.a_w, posterior.b_w, a_h, b_h)
+end
+
+function VI(X::Array{Float64, 2}, prior::NMFModel, max_iter::Int)
+    """
+    Variational Inference for NMF
+    """
+    # Initialize latent variable
+    S = init_latent_variable(X, prior)
+    posterior = deepcopy(prior)
+
+    # Inference
+    for iter in 1:max_iter
+        # Update S
+        S = update_S(X, prior)
+
+        # Update parameters
+        posterior = update_W(S, prior, posterior)
+        posterior = update_H(S, prior, posterior)
+    end
+
+    return posterior, S
 end
 
 end

@@ -23,20 +23,23 @@ function check_with_dummy_data()
     N = 2
 
     # Hyper-parameters
-    a_w = rand(Normal(), (D, M))
-    a_h = rand(Normal(), (M, N))
-    b_w = rand(Normal(), M)
-    b_h = rand(Normal(), M)
+    a_w = ones(D, M)
+    b_w = ones(M)
+    a_h = ones(M, N)
+    b_h = ones(M)
     
     # Prior
-    prior = NMF.NMFModel(D, M, N, a_w, a_h, b_w, b_h)
+    prior = NMF.NMFModel(D, M, N, a_w, b_w, a_h, b_h)
 
     # Sample dummy data
     X, S, W, H = NMF.sample_data(20, prior)
 
     # Inference
-    max_iter = 2
-    # posterior, X = NMF.VI(Y, prior, max_iter)
+    max_iter = 5
+    posterior, S_est = NMF.VI(X, prior, max_iter)
+
+    println(S)
+    println(S_est)
 end
 
 # -----------------------------------------------------------
