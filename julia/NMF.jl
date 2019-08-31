@@ -17,7 +17,7 @@ using Distributions
 using StatsFuns
 using SpecialFunctions
 
-export NMFModel
+export NMFModel, VI, sample_data
 
 struct NMFModel
     D::Int
@@ -104,7 +104,7 @@ function init_latent_variable(X::Array{Float64, 2}, prior::NMFModel)
     return S
 end
 
-function update_S(X, prior::NMFModel)
+function update_S(X::Array{Float64, 2}, prior::NMFModel)
     # Dimension
     D = prior.D
     M = prior.M
