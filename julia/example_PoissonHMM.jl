@@ -7,6 +7,7 @@ using LinearAlgebra
 using PyPlot, PyCall
 using ArgParse
 using Distributions
+using JLD
 
 push!(LOAD_PATH, ".")
 import PoissonHMM
@@ -39,6 +40,38 @@ function check_with_dummy_data()
     println(S_est)
 end
 
+function test_time_series()
+    # Load data
+    file_name = "../data/timeseries.jld"
+    X = load(file_name)["obs"]
+
+    # Prior
+    K = 2
+    a = rand(K)
+    b = rand(K)
+    alpha = rand(K)
+    beta = rand(K, K)
+    prior = PoissonHMM.PoissonHMMModel(K, a, b, alpha, beta)
+
+    # Inference
+    max_iter = 100
+    posterior, S_est = PoissonHMM.VI(X, prior, max_iter)
+    
+    # Visualize
+    figure("Poisson HMM")
+    subplot(211)
+    plot(X)
+
+    subplot(212)
+    fill_between(1:length(X), S_est[:, 1])
+
+    try
+        show()
+    catch
+        close()
+    end
+end
+
 # -----------------------------------------------------------
 # Main function
 # -----------------------------------------------------------
@@ -60,7 +93,8 @@ function main()
     parsed_args = parse_commandline()
 
     # Function hash table
-    func_dict = Dict([("dummy", check_with_dummy_data),])
+    func_dict = Dict([("dummy", check_with_dummy_data),
+                      ("time", test_time_series)])
 
     # Execute selected function
     func_dict[parsed_args["func"]]()

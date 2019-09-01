@@ -141,18 +141,18 @@ function update_S(S::Array{Float64}, X::Array{Float64},
         ln_lkh_expt[n, :] = X[n] .* ln_lambda_expt - lambda_expt
     end
 
-    ln_pi_expt = digamma.(posterior.alpha) .- digamma(sum(posterior.alpha))
+    ln_phi_expt = digamma.(posterior.alpha) .- digamma(sum(posterior.alpha))
     ln_A_expt = (digamma.(posterior.beta) 
                      .- digamma.(sum(posterior.beta, dims=1)))
 
-    ln_S_expt = deepcopy(log.(S))
+    ln_S_expt = log.(S)
 
     # Update S (n=1~N)
 
     # n = 1
     ln_S_expt[1, :] = (ln_lkh_expt[1, :] 
                            + ln_A_expt * exp.(ln_S_expt[2, :])
-                           + ln_pi_expt)
+                           + ln_phi_expt)
     ln_S_expt[1, :] .-= logsumexp(ln_S_expt[1, :])
 
     # n = 2 ~ N-1
