@@ -104,18 +104,18 @@ function init_latent_variable(X::Array{Float64, 2}, prior::NMFModel)
     return S
 end
 
-function update_S(X::Array{Float64, 2}, prior::NMFModel)
+function update_S(X::Array{Float64, 2}, posterior::NMFModel)
     # Dimension
-    D = prior.D
-    M = prior.M
-    N = prior.N
+    D = posterior.D
+    M = posterior.M
+    N = posterior.N
 
     # Latent variable
     S = zeros(D, M, N)
     for d in 1:D
         for n in 1:N
-            ln_p = (digamma.(prior.a_w[d, :]) - log.(prior.b_w) 
-                    + digamma.(prior.a_h[:, n]) - log.(prior.b_h))
+            ln_p = (digamma.(posterior.a_w[d, :]) - log.(posterior.b_w) 
+                    + digamma.(posterior.a_h[:, n]) - log.(posterior.b_h))
             ln_p .-= logsumexp(ln_p)
             S[d, :, n] = X[d, n] .+ exp.(ln_p)
         end
@@ -161,7 +161,7 @@ function VI(X::Array{Float64, 2}, prior::NMFModel, max_iter::Int)
     # Inference
     for iter in 1:max_iter
         # Update S
-        S = update_S(X, prior)
+        S = update_S(X, posterior)
 
         # Update parameters
         posterior = update_W(S, prior, posterior)

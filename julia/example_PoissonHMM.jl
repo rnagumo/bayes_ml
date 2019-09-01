@@ -28,7 +28,8 @@ function check_with_dummy_data()
     prior = PoissonHMM.PoissonHMMModel(K, a, b, alpha, beta)
 
     # Sample dummy data
-    X, S, A, pi, lambda = PoissonHMM.sample_data(5, prior)
+    sampled_model = PoissonHMM.sample_model(prior)
+    X, S = PoissonHMM.sample_data(5, sampled_model)
 
     # Inference
     max_iter = 1
