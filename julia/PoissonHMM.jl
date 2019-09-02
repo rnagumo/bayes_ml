@@ -58,6 +58,19 @@ function categorical_sample(p::Vector{Float64})
     return s
 end
 
+function logmatprod(ln_A::Array{Float64}, ln_B::Array{Float64})
+    I = size(ln_A, 1)
+    J = size(ln_B, 2)
+    ln_C = zeros(I, J)
+    for i in 1:I
+        for j in 1:J
+            ln_C[i, j] = logsumexp(ln_A[i, :] + ln_B[:, j])
+        end
+    end
+
+    return ln_C
+end
+
 # -----------------------------------------------------------
 # Sampling Functions
 # -----------------------------------------------------------
@@ -171,6 +184,58 @@ function update_S(S::Array{Float64}, X::Array{Float64},
     return exp.(ln_S_expt)
 end
 
+function update_S_fb(S::Array{Float64}, X::Array{Float64}, 
+                  posterior::PoissonHMMModel)
+    """
+    Structured Variational Inference
+
+    forward-backward algorithm
+    """
+
+    # Dimension
+    K = posterior.K
+    N = size(X, 1)
+
+    # Expectations
+    lambda_expt = posterior.a ./ posterior.b
+    ln_lambda_expt = digamma.(posterior.a) - log.(posterior.b)
+
+    ln_lkh_expt = zeros(N, K)
+    for n in 1:N
+        ln_lkh_expt[n, :] = X[n] .* ln_lambda_expt - lambda_expt
+    end
+
+    ln_phi_expt = digamma.(posterior.alpha) .- digamma(sum(posterior.alpha))
+    ln_A_expt = (digamma.(posterior.beta) 
+                     .- digamma.(sum(posterior.beta, dims=1)))
+
+    # Update S (forward-backward)
+
+    # Forward
+    ln_f = zeros(N, K)
+    ln_st = zeros(N)
+    for n in 1:N
+        if n == 1
+            ln_f[1, :] = ln_phi_expt + ln_lkh_expt[1, :]
+        else
+            ln_f[n, :] = (logmatprod(ln_A_expt, ln_f[n - 1, :])
+                              + ln_lkh_expt[n, :])
+        end
+        ln_st[n] = logsumexp(ln_f[n, :])
+        ln_f[n, :] .-= ln_st[n]
+    end
+
+    # Backward
+    ln_b = zeros(N, K)
+    for n in N - 1:-1:1
+        ln_b[n, :] = logmatprod(ln_A_expt, 
+                                ln_b[n + 1, :] + ln_lkh_expt[n + 1, :])
+        ln_b[n, :] .-= ln_st[n + 1]
+    end
+
+    return exp.(ln_f + ln_b)
+end
+
 function update_lambda(S::Array{Float64}, X::Array{Float64},
                        prior::PoissonHMMModel, posterior::PoissonHMMModel)
 
@@ -217,7 +282,8 @@ function VI(X::Array{Float64}, prior::PoissonHMMModel, max_iter::Int)
     # Inference
     for iter in 1:max_iter
         # E-step
-        S = update_S(S, X, posterior)
+        # S = update_S(S, X, posterior)
+        S = update_S_fb(S, X, posterior)
 
         # M-step
         posterior = update_lambda(S, X, prior, posterior)
