@@ -211,7 +211,7 @@ function GS(X::Array{Float64}, prior::PoissonMixtureModel, max_iter::Int)
     """
     Gibbs sampling for PoissonMixtureModel
     """
-
+    # Initialization
     S = init_latent_variable(X, prior)
     posterior = update_posterior(S, X, prior)
 

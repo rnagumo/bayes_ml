@@ -20,10 +20,10 @@ function check_with_dummy_data()
 
     # Hyper-parameters
     K = 2
-    a = rand(K)
-    b = rand(K)
-    alpha = rand(K)
-    beta = rand(K, K)
+    a = ones(K)
+    b = ones(K)
+    alpha = ones(K)
+    beta = ones(K, K)
     
     # Prior
     prior = PoissonHMM.PoissonHMMModel(K, a, b, alpha, beta)
@@ -47,10 +47,10 @@ function test_time_series()
 
     # Prior
     K = 2
-    a = rand(K)
-    b = rand(K)
-    alpha = rand(K)
-    beta = rand(K, K)
+    a = ones(K)
+    b = 0.01 * ones(K)
+    alpha = 10.0 * ones(K)
+    beta = 100.0 * eye(K) + ones(K, K)
     prior = PoissonHMM.PoissonHMMModel(K, a, b, alpha, beta)
 
     # Inference
@@ -71,6 +71,8 @@ function test_time_series()
         close()
     end
 end
+
+eye(D::Int) = Matrix{Float64}(I, D, D)
 
 # -----------------------------------------------------------
 # Main function

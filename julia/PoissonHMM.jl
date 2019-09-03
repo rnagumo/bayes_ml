@@ -236,48 +236,34 @@ function update_S_fb(S::Array{Float64}, X::Array{Float64},
     return exp.(ln_f + ln_b)
 end
 
-function update_lambda(S::Array{Float64}, X::Array{Float64},
-                       prior::PoissonHMMModel, posterior::PoissonHMMModel)
+function update_parameters(S::Array{Float64}, X::Array{Float64},
+                           prior::PoissonHMMModel)
 
+    # Dimension
+    K = prior.K
+    N = size(S, 1)
+
+    # Update
     a = S' * X + prior.a
     b = sqsum(S, 1) + prior.b
-    posterior = PoissonHMMModel(posterior.K, a, b, posterior.alpha,
-                                posterior.beta)
-    return posterior
-end
-
-function update_phi(S::Array{Float64}, prior::PoissonHMMModel, 
-                    posterior::PoissonHMMModel)
-
     alpha = S[1, :] + prior.alpha
-    posterior = PoissonHMMModel(posterior.K, posterior.a, posterior.b, alpha,
-                                posterior.beta)
-    return posterior
-end
 
-function update_A(S::Array{Float64}, prior::PoissonHMMModel, 
-                  posterior::PoissonHMMModel)
-
-    K = posterior.K
-    N = size(S, 1)
     SS = zeros(K, K)
     for n in 2:N
         SS += S[n, :] * S[n - 1, :]'
     end
-
     beta = SS + prior.beta
-    posterior = PoissonHMMModel(K, posterior.a, posterior.b, posterior.alpha,
-                                beta)
-    return posterior
+
+    return PoissonHMMModel(K, a, b, alpha, beta)
 end
 
 function VI(X::Array{Float64}, prior::PoissonHMMModel, max_iter::Int)
     """
     Variational Inference for NMF
     """
-    # Initialize latent variable
+    # Initialization
     S = init_latent_variable(X, prior)
-    posterior = deepcopy(prior)
+    posterior = update_parameters(S, X, prior)
 
     # Inference
     for iter in 1:max_iter
@@ -286,9 +272,7 @@ function VI(X::Array{Float64}, prior::PoissonHMMModel, max_iter::Int)
         S = update_S_fb(S, X, posterior)
 
         # M-step
-        posterior = update_lambda(S, X, prior, posterior)
-        posterior = update_phi(S, prior, posterior)
-        posterior = update_A(S, prior, posterior)
+        posterior = update_parameters(S, X, prior)
     end
 
     return posterior, S
