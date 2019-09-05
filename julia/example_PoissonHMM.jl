@@ -1,6 +1,6 @@
 
 """
-Example for NMF (Non-negative Matrix Factorization)
+Example for PoissonHMM (Poisson Hidden Markov Model)
 """
 
 using LinearAlgebra
