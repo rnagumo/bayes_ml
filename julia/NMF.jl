@@ -40,7 +40,7 @@ function sqsum(mat::Array{Float64}, idx::Int)
 end
 
 # -----------------------------------------------------------
-# Functions
+# Sampling Functions
 # -----------------------------------------------------------
 
 function sample_data(N::Int, model::NMFModel)
@@ -85,6 +85,10 @@ function sample_data(N::Int, model::NMFModel)
     return X, S, W, H
 end
 
+# -----------------------------------------------------------
+# Inference Functions
+# -----------------------------------------------------------
+
 function init_latent_variable(X::Array{Float64, 2}, prior::NMFModel)
     # Dimension
     D = prior.D
@@ -124,7 +128,8 @@ function update_S(X::Array{Float64, 2}, posterior::NMFModel)
     return S
 end
 
-function update_W(S::Array{Float64, 3}, prior::NMFModel, posterior::NMFModel)
+function update_parameters(S::Array{Float64, 3}, prior::NMFModel,
+                           posterior::NMFModel)
     # Dimension
     D = prior.D
     M = prior.M
@@ -134,20 +139,10 @@ function update_W(S::Array{Float64, 3}, prior::NMFModel, posterior::NMFModel)
     a_w = prior.a_w + sqsum(S, 3)
     b_w = prior.b_w + sqsum(posterior.a_h, 2) .* posterior.b_h
 
-    return NMFModel(D, M, N, a_w, b_w, posterior.a_h, posterior.b_h)
-end
-
-function update_H(S::Array{Float64, 3}, prior::NMFModel, posterior::NMFModel)
-    # Dimension
-    D = prior.D
-    M = prior.M
-    N = prior.N
-
-    # Update
     a_h = prior.a_h + sqsum(S, 1)
     b_h = prior.b_h + sqsum(posterior.a_w, 1) .* posterior.b_w
 
-    return NMFModel(D, M, N, posterior.a_w, posterior.b_w, a_h, b_h)
+    return NMFModel(D, M, N, a_w, b_w, a_h, b_h)
 end
 
 function VI(X::Array{Float64, 2}, prior::NMFModel, max_iter::Int)
@@ -156,7 +151,7 @@ function VI(X::Array{Float64, 2}, prior::NMFModel, max_iter::Int)
     """
     # Initialize latent variable
     S = init_latent_variable(X, prior)
-    posterior = deepcopy(prior)
+    posterior = update_parameters(S, prior, prior)
 
     # Inference
     for iter in 1:max_iter
@@ -164,8 +159,7 @@ function VI(X::Array{Float64, 2}, prior::NMFModel, max_iter::Int)
         S = update_S(X, posterior)
 
         # Update parameters
-        posterior = update_W(S, prior, posterior)
-        posterior = update_H(S, prior, posterior)
+        posterior = update_parameters(S, prior, posterior)
     end
 
     return posterior, S
