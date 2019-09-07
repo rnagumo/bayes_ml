@@ -32,7 +32,7 @@ end
 struct ApproximatedLogisticRegressionModel
     M::Int
     mu::Array{Float64, 1}  # M
-    rho::Array{Float64, 1}  # M
+    sigma::Array{Float64, 1}  # M
 end
 
 # -----------------------------------------------------------
@@ -49,7 +49,7 @@ function sigmoid(x)
     return 1.0 ./ (1.0 .+ exp.(x))
 end
 
-function integrated_sigmoid(x)
+function rho2sigma(x)
     return log.(1.0 .+ exp.(x))
 end
 
@@ -79,13 +79,38 @@ function sample_data(X::Array{Float64, 2},
     N = size(X, 1)
     M = model.M
 
-    # Sample S (latent variable)
+    # Sample Y
     Y = zeros(N)
     for n in 1:N
         Y[n] = rand(Bernoulli(sigmoid(model.W' * X[n, :])))
     end
 
     return Y
+end
+
+function sample_prediction(X::Array{Float64, 2},
+                           model::ApproximatedLogisticRegressionModel,
+                           L::Int=10)
+    """
+    Sample prediction Y given X and approximated posterior
+
+    L: Number of Monte Carlo sample "w"
+    """
+    # Dimension
+    N, M = size(X)
+
+    # Sample w and Y
+    W = zeros(N, M)
+    Y = zeros(N)
+    for n in 1:N
+        for l in 1:L
+            w_tmp = rand(MvNormal(model.mu, diagm(0 => model.sigma .^ 2)))
+            W[n, :] += w_tmp ./ L
+            Y[n] += sigmoid(w_tmp' * X[n, :])[1] / L
+        end
+    end
+
+    return Y, W
 end
 
 # -----------------------------------------------------------
@@ -106,18 +131,19 @@ function VI(X::Array{Float64}, Y::Array{Float64},
     for iter in 1:max_iter
         # Sample epsilon
         ep = randn(M)
-        W_tmp = mu + integrated_sigmoid(rho) .* ep
+        W_tmp = mu + rho2sigma.(rho) .* ep
 
         # Calculate gradient
-        d_mu = 0
-        d_rho = 0
+        d_mu = prior.lambda .* W_tmp + X' * (sigmoid.(X * W_tmp) - Y)
+        d_rho = (-1 ./ rho2sigma.(rho) + prior.lambda .* W_tmp .* ep
+                     + X' * (sigmoid.(X * W_tmp) - Y) .* ep) .* sigmoid.(rho)
 
         # Update variational paramters
         mu .-= lr * d_mu
         rho .-= lr * d_rho
     end
 
-    return ApproximatedLogisticRegressionModel(M, mu, rho)
+    return ApproximatedLogisticRegressionModel(M, mu, rho2sigma.(rho))
 end
 
 end
