@@ -44,10 +44,6 @@ function check_with_dummy_data()
     println(y_pred)
 end
 
-function plot_2d_gauss()
-
-end
-
 # -----------------------------------------------------------
 # Main function
 # -----------------------------------------------------------
@@ -69,8 +65,7 @@ function main()
     parsed_args = parse_commandline()
 
     # Function hash table
-    func_dict = Dict([("dummy", check_with_dummy_data),
-                      ("plot", plot_2d_gauss)])
+    func_dict = Dict([("dummy", check_with_dummy_data),])
 
     # Execute selected function
     func_dict[parsed_args["func"]]()
