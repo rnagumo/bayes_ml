@@ -30,6 +30,9 @@ struct SampledLogisticRegressionModel
 end
 
 struct ApproximatedLogisticRegressionModel
+    """
+    Gaussian approximation
+    """
     M::Int
     mu::Array{Float64, 1}  # M
     sigma::Array{Float64, 1}  # M
@@ -120,7 +123,7 @@ end
 function VI(X::Array{Float64}, Y::Array{Float64},
             prior::LogisticRegressionModel, max_iter::Int=5, lr::Float64=0.001)
     """
-    Variational Inference for NMF
+    Gradient descent
     """
     # Initialization
     M = prior.M

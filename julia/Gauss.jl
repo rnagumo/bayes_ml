@@ -4,7 +4,7 @@ module Gauss
 """
 Gaussian distribution 
 
-Inference for unknown mu and precision
+Inference unknown mu and precision
 """
 
 using LinearAlgebra

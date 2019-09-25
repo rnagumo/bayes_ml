@@ -97,9 +97,6 @@ function sample_prediction(x::Array{Float64, 1},
                            model::LinearRegressionModel)
     """
     Sample prediction Y given X
-
-    FIXME: Sample from MvTDist does not work after inference.
-    message: matrix is not Hermitian; Cholesky factorization failed.
     """
     # Dimension
     N = size(x, 1)
@@ -110,6 +107,9 @@ function sample_prediction(x::Array{Float64, 1},
     nu = 2 * model.a
     mu = X * model.m
     Lambda = (model.b / model.a) .* (eye(N) + X * model.V * X')
+
+    # FIXME: Sample from MvTDist does not work after inference.
+    # message: matrix is not Hermitian; Cholesky factorization failed.
 
     # Sample Y
     Y = rand(MvTDist(nu, mu, Lambda))
