@@ -34,7 +34,8 @@ function check_with_dummy_data()
     X, Z = GaussianMixture.sample_data(N, sampled_model)
 
     # Inference
-    posterior, Z_est = GaussianMixture.variational_inference(X, prior, 1)
+    # posterior, Z_est = GaussianMixture.variational_inference(X, prior, 1)
+    posterior, Z_est = GaussianMixture.gibbs_sampling(X, prior, 1)
 end
 
 function test_2d_plot()
@@ -64,8 +65,8 @@ function test_2d_plot()
 
     # Inference
     max_iter = 50
-    posterior, Z_est = GaussianMixture.variational_inference(
-        X, prior, max_iter)
+    # posterior, Z_est = GaussianMixture.variational_inference(X, prior, max_iter)
+    posterior, Z_est = GaussianMixture.gibbs_sampling(X, prior, max_iter)
 
     # ---------------------------------------------------------
     # Visualization

@@ -18,7 +18,7 @@ using StatsFuns
 using SpecialFunctions
 
 export GaussianMixtureModel, sample_model, sample_data
-export variational_inference
+export variational_inference, gibbs_sampling
 
 struct GaussianMixtureModel
     D::Int
@@ -78,16 +78,20 @@ function sample_model(model::GaussianMixtureModel)
     phi = rand(Dirichlet(model.alpha))
 
     # Sample Lambda
+    # Symmetric is used to avoid slightly non-Hermitian matrix
+    # https://github.com/JuliaLang/julia/issues/30831
+    # Andm Wishart only accepts Matrix.
     Lambda = zeros(D, D, K)
     for k in 1:K
-        Lambda[:, :, k] = rand(Wishart(model.nu[k], model.W[:, :, k]))
+        Lambda[:, :, k] = rand(Wishart(
+            model.nu[k], Matrix(Symmetric(model.W[:, :, k]))))
     end
 
     # Sample mu
     mu = zeros(K, D)
     for k in 1:K
-        mu[k, :] = rand(MvNormal(model.m[k, :], 
-                                 inv(model.beta[k] .* Lambda[:, :, k])))
+        mu[k, :] = rand(MvNormal(
+            model.m[k, :], Symmetric(inv(model.beta[k] .* Lambda[:, :, k]))))
     end
 
     return SampledGaussianMixtureModel(D, K, phi, mu, Lambda)
@@ -108,7 +112,8 @@ function sample_data(N::Int, model::SampledGaussianMixtureModel)
     X = zeros(N, D)
     for n in 1:N
         k = argmax(Z[n, :])
-        X[n, :] = rand(MvNormal(model.mu[k, :], inv(model.Lambda[:, :, k])))
+        X[n, :] = rand(MvNormal(
+            model.mu[k, :], Symmetric(inv(model.Lambda[:, :, k]))))
     end
 
     return X, Z
@@ -218,6 +223,52 @@ function variational_inference(X::Array{Float64}, prior::GaussianMixtureModel,
     end
 
     return posterior, Z_expt
+end
+
+# -----------------------------------------------------------
+# Gibbs Sampling Functions
+# -----------------------------------------------------------
+
+function sample_z(X::Array{Float64}, posterior::GaussianMixtureModel)
+    
+    # Dimension
+    N = size(X, 1)
+    K = posterior.K
+
+    # Sample parameters
+    model = sample_model(posterior)
+
+    # Sample Z
+    ln_Z = zeros(N, K)
+    for n in 1:N
+        for k in 1:K
+            ln_Z[n, k] = (-0.5 * (X[n, :] - model.mu[k, :])' 
+                          * model.Lambda[:, :, k] * (X[n, :] - model.mu[k, :])
+                          + 0.5 * logdet(model.Lambda[:, :, k])
+                          + log(model.phi[k]))
+        end
+        ln_Z[n, :] .-= logsumexp(ln_Z[n, :])
+    end
+
+    return exp.(ln_Z)
+end
+
+function gibbs_sampling(X::Array{Float64}, prior::GaussianMixtureModel,
+                        max_iter::Int)
+
+    # Initialization
+    Z = init_latent_variable(size(X, 1), prior.K)
+    posterior = update_posterior(Z, X, prior)
+
+    for iter in 1:max_iter
+        # Sample Z
+        Z = sample_z(X, posterior)
+
+        # Update posterior
+        posterior = update_posterior(Z, X, prior)
+    end
+
+    return posterior, Z
 end
 
 end
