@@ -64,7 +64,7 @@ function plot_2d_gauss()
     posterior = Gauss.inference(X, prior)
 
     # Prediction
-    N_pred = 20
+    N_pred = 40
     X_pred, sampled_posterior = Gauss.sample_prediction(N_pred, posterior)
 
     # -------------------------------------------------------------
@@ -73,10 +73,10 @@ function plot_2d_gauss()
 
     # Prepare x & y axis grid
     R = 200
-    xmin = minimum(X[:, 1]) - 5
-    xmax = maximum(X[:, 1]) + 5
-    ymin = minimum(X[:, 2]) - 5
-    ymax = maximum(X[:, 2]) + 5
+    xmin = minimum(X[:, 1]) - 1
+    xmax = maximum(X[:, 1]) + 1
+    ymin = minimum(X[:, 2]) - 1
+    ymax = maximum(X[:, 2]) + 1
     x1 = range(xmin, stop=xmax, length=R)
     x2 = range(ymin, stop=ymax, length=R)
     x1grid = repeat(x1, 1, R)
@@ -88,8 +88,9 @@ function plot_2d_gauss()
                   X_grid')
     Z_prior = reshape(Z_prior, R, R)
 
-    Z_posterior = pdf(MvTDist(sampled_posterior.nu, sampled_posterior.mu,
-                              sampled_posterior.Lambda),
+    Z_posterior = pdf(MvTDist(
+                          sampled_posterior.nu, sampled_posterior.mu,
+                          Matrix(Symmetric(inv(sampled_posterior.Lambda)))),
                       X_grid')
     Z_posterior = reshape(Z_posterior, R, R)
 
@@ -133,6 +134,69 @@ function gauss_pdf_1s(mu::Array, Sigma::Array, res::Int=100, c::Float64=1.0)
     return P
 end
 
+function klpq_gauss()
+    """
+    Plot the results of variational inference.
+    Minimize KL(q||p) or KL(p||q)    
+    """
+
+    mu = [0.5, 0.5]
+    Lmd = [5.2 -4.7; -4.7 5.2]
+    p = Gauss.SampledGaussModel(2, mu, Lmd)
+    q_klqp, q_klpq = Gauss.variational_inference(p)
+
+    # -------------------------------------------------------------
+    # Visualization
+    # -------------------------------------------------------------
+
+    # Prepare x & y axis grid
+    R = 200
+    xmin = -2
+    xmax = 3
+    ymin = -2
+    ymax = 3
+    x1 = range(xmin, stop=xmax, length=R)
+    x2 = range(ymin, stop=ymax, length=R)
+    x1grid = repeat(x1, 1, R)
+    x2grid = repeat(x2', R, 1)
+    X_grid = [x1grid[:] x2grid[:]]
+
+    # Gaussian PDF
+    p_pdf = pdf(MvNormal(p.mu, inv(p.Lambda)), X_grid')
+    p_pdf = reshape(p_pdf, R, R)
+
+    q_klqp_pdf = pdf(MvNormal(q_klqp.mu, inv(q_klqp.Lambda)), X_grid')
+    q_klqp_pdf = reshape(q_klqp_pdf, R, R)
+
+    q_klpq_pdf = pdf(MvNormal(q_klpq.mu, inv(q_klpq.Lambda)), X_grid')
+    q_klpq_pdf = reshape(q_klpq_pdf, R, R)
+
+    # Plot
+    figure(figsize=(12, 6))
+
+    subplot(121)
+    contour(x1grid, x2grid, p_pdf, alpha=0.9, cmap=get_cmap("binary"),
+            linestyles="dashed")
+    contour(x1grid, x2grid, q_klqp_pdf, alpha=0.9, cmap=get_cmap("bwr"))
+    title("KL(q||p)")
+
+    subplot(122)
+    contour(x1grid, x2grid, p_pdf, alpha=0.9, cmap=get_cmap("binary"),
+            linestyles="dashed")
+    contour(x1grid, x2grid, q_klpq_pdf, alpha=0.9, cmap=get_cmap("bwr"))
+    title("KL(p||q)")
+
+    tight_layout()
+    savefig("../results/kl.png")
+
+    try
+        show()
+    catch
+        close()
+    end
+
+end
+
 # -----------------------------------------------------------
 # Main function
 # -----------------------------------------------------------
@@ -155,7 +219,8 @@ function main()
 
     # Function hash table
     func_dict = Dict([("dummy", check_with_dummy_data),
-                      ("plot", plot_2d_gauss)])
+                      ("plot", plot_2d_gauss),
+                      ("kl", klpq_gauss)])
 
     # Execute selected function
     func_dict[parsed_args["func"]]()
