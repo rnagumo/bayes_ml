@@ -20,7 +20,7 @@ function metropolis_hastings(mu::Array, Sigma::Array, max_iter::Int)
     """
 
     # Dimension
-    D = size(Sigma, 1)
+    D = size(mu, 1)
 
     # Sample
     sample_list = zeros(max_iter, D)
@@ -64,13 +64,18 @@ function hamiltonian_montecarlo(mu::Array, Sigma::Array, max_iter::Int,
     """
 
     # Dimension
-    D = size(Sigma, 1)
+    D = size(mu, 1)
 
     # Potential energy
+    # q is the target variable.
+    # In practice, U is negative unnormalized log posterior with T=1
+    # i.e., U(q) = -log p(q|D) = -log p(q) - log p(D|q) + const
+    # although const is often neglected.
+    # In this case, U(q) = -log N(q|0, I)
     U(q::Array) = q' * q / 2
     grad_U(q::Array) = q
 
-    # Kinetic energy
+    # Kinetic energy (T = 1, M = I)
     K(p::Array) = p' * p / 2
     grad_K(p::Array) = p
     
@@ -83,8 +88,8 @@ function hamiltonian_montecarlo(mu::Array, Sigma::Array, max_iter::Int,
 
     for iter in 1:(max_iter + burnin)
         # Initialization
-        q = deepcopy(current_q)
         current_p = randn(D)
+        q = deepcopy(current_q)
         p = deepcopy(current_p)
 
         # HMC Step

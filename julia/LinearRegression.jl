@@ -108,13 +108,20 @@ function sample_prediction(x::Array{Float64, 1},
     mu = X * model.m
     Lambda = (model.b / model.a) .* (eye(N) + X * model.V * X')
 
-    # FIXME: Sample from MvTDist does not work after inference.
-    # message: matrix is not Hermitian; Cholesky factorization failed.
-
     # Sample Y
-    Y = rand(MvTDist(nu, mu, Lambda))
+    Y = rand(MvTDist(nu, mu, Matrix(Symmetric(inv(Lambda)))))
 
     return Y, SampledTDistModel(D, nu, mu, Lambda)
+end
+
+function sample_fn(x::Array{Float64, 1}, model::SampledLinearRegressionModel)
+
+    # Dimension
+    D = model.D
+    X = basis_func(x, D)
+
+    fn = X * model.w
+    return fn, sqrt(model.sg2)
 end
 
 # -----------------------------------------------------------
