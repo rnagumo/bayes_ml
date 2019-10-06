@@ -71,9 +71,9 @@ function hamiltonian_montecarlo(mu::Array, Sigma::Array, max_iter::Int,
     # In practice, U is negative unnormalized log posterior with T=1
     # i.e., U(q) = -log p(q|D) = -log p(q) - log p(D|q) + const
     # although const is often neglected.
-    # In this case, U(q) = -log N(q|0, I)
-    U(q::Array) = q' * q / 2
-    grad_U(q::Array) = q
+    # In this case, U(q) = -log N(q|mu, Sigma)
+    U(q::Array) = (q - mu)' * inv(Sigma) * (q - mu) / 2
+    grad_U(q::Array) = inv(Sigma) * (q - mu)
 
     # Kinetic energy (T = 1, M = I)
     K(p::Array) = p' * p / 2
@@ -120,8 +120,10 @@ function hamiltonian_montecarlo(mu::Array, Sigma::Array, max_iter::Int,
         if rand() <= min(1, exp(-proposed_H + current_H))
             # Accept
             sample_list[iter, :] = q
-            acpt_cnt += 1
             current_q = q
+            if iter > burnin
+                acpt_cnt += 1
+            end
         else
             # Reject
             sample_list[iter, :] = current_q
@@ -130,7 +132,7 @@ function hamiltonian_montecarlo(mu::Array, Sigma::Array, max_iter::Int,
 
     sample_list = sample_list[burnin:max_iter + burnin, :]
 
-    return sample_list, round(acpt_cnt / (max_iter + burnin), digits=2)
+    return sample_list, round(acpt_cnt / max_iter, digits=2)
 end
 
 function gibbs_sampling(mu::Array, Sigma::Array, max_iter::Int)

@@ -40,10 +40,8 @@ function test_2d_plot()
 
     samples_mh, acpt_rate_mh = MCMC.metropolis_hastings(mu, Sigma, max_iter)
     samples_hmc, acpt_rate_hmc = MCMC.hamiltonian_montecarlo(
-        mu, Sigma, max_iter, 0.3, 4, 5)
+        mu, Sigma, max_iter, 0.25, 25, 100)
     samples_gibbs = MCMC.gibbs_sampling(mu, Sigma, max_iter)
-
-    # println(samples_hmc[1:10, :])
 
     # -------------------------------------------------------------
     # Visualization
@@ -71,7 +69,7 @@ function test_2d_plot()
     subplot(133)
     plot(p_pdf[:, 1], p_pdf[:, 2], alpha=0.9)
     plot(samples_gibbs[:, 1], samples_gibbs[:, 2], "--o", alpha=0.6,
-         label="acceptance ratio = 1.0")
+         label="acceptance ratio = 1.00")
     legend(loc="upper right")
     title("Gibbs sampling")
 
