@@ -33,6 +33,19 @@ function basis_func(x::Array{Float64, 1}, D::Int)
     Basis function that converts scalar to D-dimensional vector
 
     x -> [1, x, x^2, ..., x^{D-1}]
+
+    Parameters
+    ----------
+    x : Array of size N
+        Input vector 
+
+    D : Int
+        Output dimensio
+
+    Returns
+    -------
+    X : Array of size N*D
+        Converted output vector
     """
 
     X = repeat(x, 1, D) .^ (0:D - 1)'
