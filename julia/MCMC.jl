@@ -32,10 +32,10 @@ function metropolis_hastings(mu::Array, Sigma::Array, max_iter::Int)
     for iter in 1:max_iter
         # Sample new state from proposal
         # Nomral Gauss (random-walk), symmetric q(z1|z0) = q(z0|z1)
-        # In this case, MH equals to Metroplis algorithm
+        # In this case, MH equals to random-walk Metroplis
         z1 = rand(MvNormal(z0, eye(D)))
 
-        # Calculate probability of target distribution
+        # Calculate unnormalized probability of target distribution
         # with Gaussian kernel
         z0_dist = exp(-0.5 * (z0 - mu)' * Sigma * (z0 - mu))
         z1_dist = exp(-0.5 * (z1 - mu)' * Sigma * (z1 - mu))
@@ -69,13 +69,14 @@ function hamiltonian_montecarlo(mu::Array, Sigma::Array, max_iter::Int,
     # Potential energy
     # q is the target variable.
     # In practice, U is negative unnormalized log posterior with T=1
-    # i.e., U(q) = -log p(q|D) = -log p(q) - log p(D|q) + const
+    # i.e., U(q) = -log P(q|D) = -log P(q) - log P(D|q) + const
     # although const is often neglected.
     # In this case, U(q) = -log N(q|mu, Sigma)
     U(q::Array) = (q - mu)' * inv(Sigma) * (q - mu) / 2
     grad_U(q::Array) = inv(Sigma) * (q - mu)
 
     # Kinetic energy (T = 1, M = I)
+    # K(p) = -log N(p|0, 1)
     K(p::Array) = p' * p / 2
     grad_K(p::Array) = p
     

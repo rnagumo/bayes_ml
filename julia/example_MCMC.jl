@@ -69,7 +69,7 @@ function test_2d_plot()
     subplot(133)
     plot(p_pdf[:, 1], p_pdf[:, 2], alpha=0.9)
     plot(samples_gibbs[:, 1], samples_gibbs[:, 2], "--o", alpha=0.6,
-         label="acceptance ratio = 1.00")
+         label="acceptance ratio = 1.0")
     legend(loc="upper right")
     title("Gibbs sampling")
 
