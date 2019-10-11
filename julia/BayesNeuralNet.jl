@@ -83,21 +83,45 @@ function sample_data_from_prior(model::BayesNNModel, x::Array{Float64, 1})
 end
 
 function laprace_approximation(model::BayesNNModel, x::Array{Float64, 1},
-                               lr::Float64=0.01, max_iter::Int=10)
+                               y::Array{Float64, 2}, lr::Float64=0.01,
+                               max_iter::Int=5)
     
+    # Dimension
     M = model.M
     K = model.K
     D = model.D
     N = size(x, 1)
+
+    # Inputs
+    X = basis_func(x, M)  # N*M
 
     # Initialize parameters
     W1 = sqrt(model.sigma2_w) .* randn(K, M)
     W2 = sqrt(model.sigma2_w) .* randn(D, K)
 
     for iter in 1:max_iter
+        # Forward
+        a1 = X * W1'
+        z1 = tanh.(a1)
 
+        a2 = z1 * W2'
 
+        # Backward
+        d2 = a2 - y
+        dE_dW2 = d2' * z1
+
+        d1 = (1 ./ cosh.(a1) .^ 2) .* (d2 * W2)
+        dE_dW1 = d1' * X
+
+        # Gradient
+        dp_dW2 = -(1 / model.sigma2_y .* dE_dW2 + 1 / model.sigma2_w .* W2)
+        dp_dW1 = -(1 / model.sigma2_y .* dE_dW1 + 1 / model.sigma2_w .* W1)
+
+        # Update Parameters
+        W2 = W2 + lr .* dp_dW2
+        W1 = W1 + lr .* dp_dW1
     end
+
 end
 
 end

@@ -19,7 +19,7 @@ function check_with_dummy_data()
 
     #Prior
     M = 2
-    K = 2
+    K = 4
     D = 1
     sigma2_w = 1.0
     sigma2_y = 1.0
@@ -29,8 +29,7 @@ function check_with_dummy_data()
     x = collect(range(0.0, stop=10.0, length=20))
     Y, Y_obs, nn_model = BayesNeuralNet.sample_data_from_prior(prior, x)
 
-    println(size(Y))
-    println(size(Y_obs))
+    BayesNeuralNet.laprace_approximation(prior, x, Y_obs)
 end
 
 function main_prior_plot()
