@@ -155,7 +155,7 @@ def init_dataloader(root, cuda=False, batch_size=128):
 
 
 def init_args():
-    parser = argparse.ArgumentParser(description="VAE MNIST")
+    parser = argparse.ArgumentParser(description="VRNN MNIST")
     parser.add_argument("--logdir", type=str, default="../logs/tmp/")
     parser.add_argument("--data-root", type=str, default="../data/")
     parser.add_argument("--batch-size", type=int, default=128)
