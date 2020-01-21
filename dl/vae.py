@@ -103,7 +103,7 @@ def init_args():
     parser.add_argument("--logdir", type=str, default="../logs/tmp/")
     parser.add_argument("--data-root", type=str, default="../data/")
     parser.add_argument("--batch-size", type=int, default=128)
-    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--cuda", action="store_true")
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--z-dim", type=int, default=64)

@@ -97,20 +97,18 @@ class Inference(pxd.Normal):
 
 
 def data_loop(loader, model, h_dim, device, train_mode=True):
-    mean_loss = 0
+    loss = 0
     for data, _ in tqdm.tqdm(loader):
         x = data.transpose(0, 1).to(device)
         batch_size = x.shape[1]
         h_prev = torch.zeros(batch_size, h_dim).to(device)
 
         if train_mode:
-            mean_loss += model.train({"x": x, "h_prev": h_prev})
+            loss += model.train({"x": x, "h_prev": h_prev}) * batch_size
         else:
-            mean_loss += model.test({"x": x, "h_prev": h_prev})
+            loss += model.test({"x": x, "h_prev": h_prev}) * batch_size
 
-        mean_loss *= batch_size
-
-    return mean_loss / len(loader.dataset)
+    return loss / len(loader.dataset)
 
 
 def plot_image_from_latent(generate_from_prior, decoder, batch_size, h_dim,
@@ -159,7 +157,7 @@ def init_args():
     parser.add_argument("--logdir", type=str, default="../logs/tmp/")
     parser.add_argument("--data-root", type=str, default="../data/")
     parser.add_argument("--batch-size", type=int, default=128)
-    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--cuda", action="store_true")
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--h-dim", type=int, default=100)

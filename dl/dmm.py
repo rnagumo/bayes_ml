@@ -74,20 +74,18 @@ class Prior(pxd.Normal):
 
 
 def data_loop(loader, model, z_dim, device, train_mode=True):
-    mean_loss = 0
+    loss = 0
     for data, _ in tqdm.tqdm(loader):
         x = data.transpose(0, 1).to(device)
-        batch_size = x.shape[1]
+        batch_size = x.size(1)
         z_prev = torch.zeros(batch_size, z_dim).to(device)
 
         if train_mode:
-            mean_loss += model.train({"x": x, "z_prev": z_prev})
+            loss += model.train({"x": x, "z_prev": z_prev}) * batch_size
         else:
-            mean_loss += model.test({"x": x, "z_prev": z_prev})
+            loss += model.test({"x": x, "z_prev": z_prev}) * batch_size
 
-        mean_loss *= batch_size
-
-    return mean_loss / len(loader.dataset)
+    return loss / len(loader.dataset)
 
 
 def plot_image_from_latent(generate_from_prior, decoder, batch_size, z_dim,
@@ -131,16 +129,16 @@ def init_dataloader(root, cuda=False, batch_size=128):
 
 
 def init_args():
-    parser = argparse.ArgumentParser(description="VAE MNIST")
+    parser = argparse.ArgumentParser(description="DMM MNIST")
     parser.add_argument("--logdir", type=str, default="../logs/tmp/")
     parser.add_argument("--data-root", type=str, default="../data/")
     parser.add_argument("--batch-size", type=int, default=128)
-    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--cuda", action="store_true")
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--h-dim", type=int, default=32)
     parser.add_argument("--hidden-dim", type=int, default=32)
-    parser.add_argument("--z-dim", type=int, default=64)
+    parser.add_argument("--z-dim", type=int, default=16)
 
     return parser.parse_args()
 
@@ -195,8 +193,7 @@ def main():
     # Loss
     ce = pxl.CrossEntropy(encoder, decoder)
     kl = pxl.KullbackLeibler(encoder, prior)
-    step_loss = ce + kl
-    _loss = pxl.IterativeLoss(step_loss, max_iter=t_max, series_var=["x", "h"],
+    _loss = pxl.IterativeLoss(ce + kl, max_iter=t_max, series_var=["x", "h"],
                               update_value={"z": "z_prev"})
     loss = _loss.expectation(rnn).mean()
 
