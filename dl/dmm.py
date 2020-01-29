@@ -198,9 +198,9 @@ def main():
     loss = _loss.expectation(rnn).mean()
 
     # Model
-    vrnn = pxm.Model(loss, distributions=[rnn, encoder, decoder, prior],
-                     optimizer=optim.Adam, optimizer_params={"lr": 1e-3},
-                     clip_grad_value=10)
+    model = pxm.Model(loss, distributions=[rnn, encoder, decoder, prior],
+                      optimizer=optim.Adam, optimizer_params={"lr": 1e-3},
+                      clip_grad_value=10)
 
     # -------------------------------------------------------------------------
     # 4. Training
@@ -208,9 +208,9 @@ def main():
 
     for epoch in range(1, args.epochs + 1):
         # Training
-        train_loss = data_loop(train_loader, vrnn, z_dim, device,
+        train_loss = data_loop(train_loader, model, z_dim, device,
                                train_mode=True)
-        test_loss = data_loop(test_loader, vrnn, z_dim, device,
+        test_loss = data_loop(test_loader, model, z_dim, device,
                               train_mode=False)
 
         # Sample data
