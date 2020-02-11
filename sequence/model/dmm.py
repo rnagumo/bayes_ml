@@ -93,13 +93,17 @@ class RNN(pxd.Deterministic):
         return {"h": h[:, :, h.size(2) // 2:]}
 
 
-def load_dmm_model(x_dim, t_max, device, args):
+def load_dmm_model(x_dim, t_max, device, config):
+
+    # Config
+    model_cfg = config["dmm_params"]
+    trainer_cfg = config["trainer_params"]
 
     # Latent dimension
-    h_dim = args.h_dim
-    hidden_dim = args.hidden_dim
-    z_dim = args.z_dim
-    trans_dim = args.trans_dim
+    h_dim = model_cfg["h_dim"]
+    hidden_dim = model_cfg["hidden_dim"]
+    z_dim = model_cfg["z_dim"]
+    trans_dim = model_cfg["trans_dim"]
 
     # Distributions
     prior = GatedTrainsitionPrior(z_dim, trans_dim).to(device)
@@ -111,14 +115,15 @@ def load_dmm_model(x_dim, t_max, device, args):
     ce = pxl.CrossEntropy(encoder, decoder)
     kl = pxl.KullbackLeibler(encoder, prior)
     _loss = KLAnnealedIterativeLoss(
-        ce, kl, args.annealing_epochs, args.min_factor, max_iter=t_max,
-        series_var=["x", "h"], update_value={"z": "z_prev"})
+        ce, kl, trainer_cfg["annealing_epochs"], trainer_cfg["min_factor"],
+        max_iter=t_max, series_var=["x", "h"], update_value={"z": "z_prev"})
     loss = _loss.expectation(rnn).mean()
 
     # Model
-    dmm = pxm.Model(loss, distributions=[rnn, encoder, decoder, prior],
-                    optimizer=optim.Adam,
-                    optimizer_params={"weight_decay": args.weight_decay})
+    dmm = pxm.Model(
+        loss, distributions=[rnn, encoder, decoder, prior],
+        optimizer=optim.Adam,
+        optimizer_params={"weight_decay": trainer_cfg["weight_decay"]})
 
     # Sampler
     generate_from_prior = prior * decoder

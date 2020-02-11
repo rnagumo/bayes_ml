@@ -98,11 +98,15 @@ class Inference(pxd.Normal):
         return {"loc": loc, "scale": scale}
 
 
-def load_vrnn_model(x_dim, t_max, device, args):
+def load_vrnn_model(x_dim, t_max, device, config):
+
+    # Config
+    model_cfg = config["vrnn_params"]
+    trainer_cfg = config["trainer_params"]
 
     # Latent dimension
-    h_dim = args.h_dim
-    z_dim = args.z_dim
+    h_dim = model_cfg["h_dim"]
+    z_dim = model_cfg["z_dim"]
 
     # Functions
     f_phi_x = Phi_x(x_dim, h_dim).to(device)
@@ -115,17 +119,19 @@ def load_vrnn_model(x_dim, t_max, device, args):
     recurrence = Recurrence(h_dim, f_phi_x, f_phi_z).to(device)
 
     # Loss
-    reconst = pxl.StochasticReconstructionLoss(
+    recon = pxl.StochasticReconstructionLoss(
         encoder * recurrence, decoder)
     kl = pxl.KullbackLeibler(encoder, prior)
     _loss = KLAnnealedIterativeLoss(
-        reconst, kl, args.annealing_epochs, args.min_factor, max_iter=t_max,
-        series_var=["x"], update_value={"h": "h_prev"})
+        recon, kl, trainer_cfg["annealing_epochs"], trainer_cfg["min_factor"],
+        max_iter=t_max, series_var=["x"], update_value={"h": "h_prev"})
     loss = _loss.mean()
 
     # Model
-    vrnn = pxm.Model(loss, distributions=[encoder, decoder, prior, recurrence],
-                     optimizer=optim.Adam)
+    vrnn = pxm.Model(
+        loss, distributions=[encoder, decoder, prior, recurrence],
+        optimizer=optim.Adam,
+        optimizer_params={"weight_decay": trainer_cfg["weight_decay"]})
 
     # Sampler
     generate_from_prior = prior * decoder * recurrence
