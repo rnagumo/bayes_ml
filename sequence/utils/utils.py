@@ -50,21 +50,3 @@ def init_logger(path):
     logger.addHandler(fh)
 
     return logger
-
-
-def plot_image_from_latent(generate_from_prior, decoder, z_dim, t_max, device):
-
-    x = []
-    z_prev = torch.zeros(1, z_dim).to(device)
-    with torch.no_grad():
-        for _ in range(t_max):
-            # Sample
-            samples = generate_from_prior.sample({"z_prev": z_prev})
-            x_t = decoder.sample_mean({"z": samples["z"]})
-
-            # Update
-            z_prev = samples["z"]
-            x.append(x_t[None, :])
-
-        x = torch.cat(x, dim=0).transpose(0, 1)
-        return x[:, None]
