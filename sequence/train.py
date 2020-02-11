@@ -12,10 +12,10 @@ from torch.utils import tensorboard
 from data.polydata import init_poly_dataloader
 from model.dmm import load_dmm_model
 from model.vrnn import load_vrnn_model
-from utils.utils import init_logger
+from utils.utils import init_logger, load_config
 
 
-def data_loop(loader, model, device, args, train_mode=True):
+def data_loop(loader, model, device, args, config, train_mode=True):
 
     # Returned values
     total_loss = 0
@@ -35,10 +35,12 @@ def data_loop(loader, model, device, args, train_mode=True):
         minibatch_size = x.size(1)
         if args.model == "dmm":
             var_name = "z_prev"
-            var = torch.zeros(minibatch_size, args.z_dim).to(device)
+            var = torch.zeros(
+                minibatch_size, config["dmm_params"]["z_dim"]).to(device)
         elif args.model == "vrnn":
             var_name = "h_prev"
-            var = torch.zeros(minibatch_size, args.h_dim).to(device)
+            var = torch.zeros(
+                minibatch_size, config["vrnn_params"]["h_dim"]).to(device)
 
         # Train / test
         if train_mode:
@@ -53,15 +55,16 @@ def data_loop(loader, model, device, args, train_mode=True):
     return total_loss / total_len
 
 
-def plot_image_from_latent(generate_from_prior, decoder, t_max, device, args):
+def plot_image_from_latent(generate_from_prior, decoder, t_max, device, args,
+                           config):
 
     if args.model == "dmm":
         var_name = "z"
-        var = torch.zeros(1, args.z_dim).to(device)
+        var = torch.zeros(1, config["dmm_params"]["z_dim"]).to(device)
         input_keys = ["z"]
     elif args.model == "vrnn":
         var_name = "h"
-        var = torch.zeros(1, args.h_dim).to(device)
+        var = torch.zeros(1, config["vrnn_params"]["h_dim"]).to(device)
         input_keys = ["z", "h_prev"]
 
     x = []
@@ -79,41 +82,7 @@ def plot_image_from_latent(generate_from_prior, decoder, t_max, device, args):
         return x[:, None]
 
 
-def init_args():
-    parser = argparse.ArgumentParser(description="Polyphonic data training")
-
-    # Direcotry settings
-    group_1 = parser.add_argument_group("Directory settings")
-    group_1.add_argument("--logdir", type=str, default="../logs/seq/tmp/")
-    group_1.add_argument("--root", type=str, default="../data/poly/")
-    group_1.add_argument("--filename", type=str, default="JSB_Chorales.pickle")
-    group_1.add_argument("--model", type=str, default="dmm")
-
-    # Model parameters
-    group_2 = parser.add_argument_group("Model parameters")
-    group_2.add_argument("--h-dim", type=int, default=600)
-    group_2.add_argument("--hidden-dim", type=int, default=100)
-    group_2.add_argument("--z-dim", type=int, default=100)
-    group_2.add_argument("--trans-dim", type=int, default=200)
-
-    # Training parameters
-    group_3 = parser.add_argument_group("Training parameters")
-    group_3.add_argument("--test", action="store_true")
-    group_3.add_argument("--cuda", action="store_true")
-    group_3.add_argument("--seed", type=int, default=1)
-    group_3.add_argument("--batch-size", type=int, default=20)
-    group_3.add_argument("--epochs", type=int, default=5)
-    group_3.add_argument("--annealing-epochs", type=int, default=1000)
-    group_3.add_argument("--min-factor", type=float, default=0.2)
-
-    # Adam parameters
-    group_3 = parser.add_argument_group("Adam parameters")
-    group_3.add_argument("--weight-decay", type=float, default=2.0)
-
-    return parser.parse_args()
-
-
-def train(args, logger, load_model):
+def train(args, logger, config, load_model):
 
     # -------------------------------------------------------------------------
     # 1. Settings
@@ -150,7 +119,7 @@ def train(args, logger, load_model):
     # -------------------------------------------------------------------------
 
     model, generate_from_prior, decoder = load_model(
-        x_dim, t_max, device, args)
+        x_dim, t_max, device, config)
 
     # -------------------------------------------------------------------------
     # 4. Training
@@ -160,16 +129,16 @@ def train(args, logger, load_model):
         logger.info(f"--- Epoch {epoch} ---")
 
         # Training
-        train_loss = data_loop(train_loader, model, device, args,
+        train_loss = data_loop(train_loader, model, device, args, config,
                                train_mode=True)
-        valid_loss = data_loop(valid_loader, model, device, args,
+        valid_loss = data_loop(valid_loader, model, device, args, config,
                                train_mode=False)
-        test_loss = data_loop(test_loader, model, device, args,
+        test_loss = data_loop(test_loader, model, device, args, config,
                               train_mode=False)
 
         # Sample data
         sample = plot_image_from_latent(
-            generate_from_prior, decoder, t_max, device, args)
+            generate_from_prior, decoder, t_max, device, args, config)
 
         # Log
         writer.add_scalar("train_loss", train_loss.item(), epoch)
@@ -184,6 +153,24 @@ def train(args, logger, load_model):
     writer.close()
 
 
+def init_args():
+    parser = argparse.ArgumentParser(description="Polyphonic data training")
+
+    # Direcotry settings
+    parser.add_argument("--logdir", type=str, default="../logs/seq/tmp/")
+    parser.add_argument("--root", type=str, default="../data/poly/")
+    parser.add_argument("--filename", type=str, default="JSB_Chorales.pickle")
+    parser.add_argument("--config", type=str, default="./config.json")
+    parser.add_argument("--model", type=str, default="dmm")
+    parser.add_argument("--test", action="store_true")
+    parser.add_argument("--cuda", action="store_true")
+    parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--batch-size", type=int, default=20)
+    parser.add_argument("--epochs", type=int, default=5)
+
+    return parser.parse_args()
+
+
 def main():
     # Args
     args = init_args()
@@ -192,6 +179,9 @@ def main():
     logger = init_logger(args.logdir)
     logger.info("Start logger")
     logger.info(f"Commant line args: {args}")
+
+    # Config
+    config = load_config(args.config)
 
     # Select model
     if args.model == "dmm":
@@ -202,7 +192,7 @@ def main():
         raise NotImplementedError("Selected model is not implemented")
 
     try:
-        train(args, logger, load_func)
+        train(args, logger, config, load_func)
     except Exception as e:
         logger.exception(f"Run function error: {e}")
 

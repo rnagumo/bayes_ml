@@ -1,6 +1,7 @@
 
 """Utils for training"""
 
+import json
 import logging
 import pathlib
 import time
@@ -48,3 +49,11 @@ def init_logger(path):
     logger.addHandler(fh)
 
     return logger
+
+
+def load_config(path):
+
+    with pathlib.Path(path).open() as f:
+        config = json.load(f)
+
+    return config
