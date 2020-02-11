@@ -9,8 +9,9 @@ import tqdm
 import torch
 from torch.utils import tensorboard
 
-from data.polydata import init_poly_dataloader
+from dataset.polydata import init_poly_dataloader
 from model.dmm import load_dmm_model
+from model.srnn import load_srnn_model
 from model.vrnn import load_vrnn_model
 from utils.utils import init_logger, load_config
 
@@ -25,6 +26,7 @@ def data_loop(loader, model, device, args, config, train_mode=True):
     for x, seq_len in tqdm.tqdm(loader):
         # Input dimension must be (timestep_size, batch_size, feature_size)
         x = x.transpose(0, 1).to(device)
+        data = {"x": x}
 
         # Mask for sequencial data
         mask = torch.zeros(x.size(0), x.size(1)).to(device)
@@ -34,19 +36,28 @@ def data_loop(loader, model, device, args, config, train_mode=True):
         # Initial latent variable
         minibatch_size = x.size(1)
         if args.model == "dmm":
-            var_name = "z_prev"
-            var = torch.zeros(
-                minibatch_size, config["dmm_params"]["z_dim"]).to(device)
+            data.update({
+                "z_prev": torch.zeros(
+                    minibatch_size, config["dmm_params"]["z_dim"]).to(device),
+            })
         elif args.model == "vrnn":
-            var_name = "h_prev"
-            var = torch.zeros(
-                minibatch_size, config["vrnn_params"]["h_dim"]).to(device)
+            data.update({
+                "h_prev": torch.zeros(
+                    minibatch_size, config["vrnn_params"]["h_dim"]).to(device),
+            })
+        elif args.model == "srnn":
+            data.update({
+                "z_prev": torch.zeros(
+                    minibatch_size, config["srnn_params"]["z_dim"]).to(device),
+                "u": torch.cat(
+                    [torch.zeros(1, x.size(1), x.size(2)), x[:-1]]).to(device),
+            })
 
         # Train / test
         if train_mode:
-            _loss = model.train({"x": x, var_name: var}, mask=mask)
+            _loss = model.train(data, mask=mask)
         else:
-            _loss = model.test({"x": x, var_name: var}, mask=mask)
+            _loss = model.test(data, mask=mask)
 
         # Add training results
         total_loss += _loss * minibatch_size
@@ -56,29 +67,46 @@ def data_loop(loader, model, device, args, config, train_mode=True):
 
 
 def plot_image_from_latent(generate_from_prior, decoder, t_max, device, args,
-                           config):
+                           config, x_dim):
 
     if args.model == "dmm":
-        var_name = "z"
-        var = torch.zeros(1, config["dmm_params"]["z_dim"]).to(device)
-        input_keys = ["z"]
+        data = {"z_prev": torch.zeros(
+                    1, config["dmm_params"]["z_dim"]).to(device)}
+        latent_keys = ["z"]
+        update_key_dict = {"z_prev": "z"}
     elif args.model == "vrnn":
-        var_name = "h"
-        var = torch.zeros(1, config["vrnn_params"]["h_dim"]).to(device)
-        input_keys = ["z", "h_prev"]
+        data = {"h_prev": torch.zeros(
+                    1, config["vrnn_params"]["h_dim"]).to(device)}
+        latent_keys = ["z", "h_prev"]
+        update_key_dict = {"h_prev": "h"}
+    elif args.model == "srnn":
+        data = {"z_prev": torch.zeros(
+                    1, 1, config["srnn_params"]["z_dim"]).to(device),
+                "d_prev": torch.zeros(
+                    1, 1, config["srnn_params"]["d_dim"]).to(device),
+                "u": torch.zeros(1, 1, x_dim)}
+        latent_keys = ["z", "d"]
+        update_key_dict = {"z_prev": "z", "d_prev": "d"}
 
     x = []
     with torch.no_grad():
         for _ in range(t_max):
             # Sample
-            samples = generate_from_prior.sample({var_name + "_prev": var})
-            x_t = decoder.sample_mean({k: samples[k] for k in input_keys})
+            samples = generate_from_prior.sample(data)
+            x_t = decoder.sample_mean({k: samples[k] for k in latent_keys})
 
             # Update
-            var = samples[var_name]
-            x.append(x_t[None, :])
+            for key, var_name in update_key_dict.items():
+                data[key] = samples[var_name]
 
-        x = torch.cat(x, dim=0).transpose(0, 1)
+            # Add to data list
+            if args.model == "srnn":
+                data["u"] = x_t
+                x.append(x_t)
+            else:
+                x.append(x_t[None, :])
+
+        x = torch.cat(x).transpose(0, 1)
         return x[:, None]
 
 
@@ -138,7 +166,7 @@ def train(args, logger, config, load_model):
 
         # Sample data
         sample = plot_image_from_latent(
-            generate_from_prior, decoder, t_max, device, args, config)
+            generate_from_prior, decoder, t_max, device, args, config, x_dim)
 
         # Log
         writer.add_scalar("train_loss", train_loss.item(), epoch)
@@ -189,6 +217,8 @@ def main():
         load_func = load_dmm_model
     elif args.model == "vrnn":
         load_func = load_vrnn_model
+    elif args.model == "srnn":
+        load_func = load_srnn_model
     else:
         raise NotImplementedError("Selected model is not implemented")
 

@@ -13,5 +13,10 @@
     "vrnn_params": {
         "h_dim": 600,
         "z_dim": 100
+    },
+    "srnn_params": {
+        "d_dim": 600,
+        "z_dim": 100,
+        "a_dim": 600
     }
 }
