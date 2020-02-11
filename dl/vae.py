@@ -107,6 +107,8 @@ def init_args():
     parser.add_argument("--cuda", action="store_true")
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--z-dim", type=int, default=64)
+    parser.add_argument("--plot-dim", type=int, default=8)
+    parser.add_argument("--plot-recon", type=int, default=8)
 
     return parser.parse_args()
 
@@ -147,7 +149,7 @@ def main():
     z_dim = args.z_dim
 
     # Latent data for visualization
-    z_sample = 0.5 * torch.randn(z_dim, z_dim).to(device)
+    z_sample = 0.5 * torch.randn(args.plot_dim, z_dim).to(device)
 
     # -------------------------------------------------------------------------
     # 3. Model
@@ -171,7 +173,8 @@ def main():
         train_loss = data_loop(train_loader, model, device, train_mode=True)
         test_loss = data_loop(test_loader, model, device, train_mode=False)
 
-        recon = plot_reconstruction(_x[:8], q, p, image_dim, image_dim)
+        recon = plot_reconstruction(
+            _x[:args.plot_recon], q, p, image_dim, image_dim)
         sample = plot_image_from_latent(z_sample, p, image_dim, image_dim)
 
         writer.add_scalar("train_loss", train_loss.item(), epoch)
