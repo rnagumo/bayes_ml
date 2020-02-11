@@ -16,7 +16,7 @@ from model.vrnn import load_vrnn_model, init_vrnn_variable, get_vrnn_update
 from utils.utils import init_logger, load_config
 
 
-def data_loop(loader, model, args, config, train_mode=True):
+def data_loop(epoch, loader, model, args, config, train_mode=True):
 
     device = config["device"]
 
@@ -41,9 +41,9 @@ def data_loop(loader, model, args, config, train_mode=True):
 
         # Train / test
         if train_mode:
-            _loss = model.train(data, mask=mask)
+            _loss = model.train(data, mask=mask, epoch=epoch)
         else:
-            _loss = model.test(data, mask=mask)
+            _loss = model.test(data, mask=mask, epoch=epoch)
 
         # Add training results
         total_loss += _loss * minibatch_size
@@ -127,9 +127,9 @@ def train(args, logger, config):
         logger.info(f"--- Epoch {epoch} ---")
 
         # Training
-        train_loss = data_loop(train_loader, model, args, config, True)
-        valid_loss = data_loop(valid_loader, model, args, config, False)
-        test_loss = data_loop(test_loader, model, args, config, False)
+        train_loss = data_loop(epoch, train_loader, model, args, config, True)
+        valid_loss = data_loop(epoch, valid_loader, model, args, config, False)
+        test_loss = data_loop(epoch, test_loader, model, args, config, False)
 
         # Sample data
         sample = draw_image(generate_from_prior, decoder, args, config)
