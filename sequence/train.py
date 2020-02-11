@@ -182,6 +182,7 @@ def main():
 
     # Config
     config = load_config(args.config)
+    logger.info(f"Configs: {config}")
 
     # Select model
     if args.model == "dmm":
