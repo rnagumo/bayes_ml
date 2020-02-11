@@ -126,3 +126,31 @@ def load_srnn_model(config):
     generate_from_prior = prior * frnn * decoder
 
     return dmm, generate_from_prior, decoder
+
+
+def init_srnn_variable(minibatch_size, config, x, **kwargs):
+
+    data = {
+        "z_prev": torch.zeros(
+            minibatch_size, config["srnn_params"]["z_dim"]
+        ).to(config["device"]),
+        "u": torch.cat(
+            [torch.zeros(1, minibatch_size, config["x_dim"]), x[:-1]]
+        ).to(config["device"]),
+    }
+
+    return data
+
+
+def get_srnn_update(config):
+    data = {
+        "z_prev": torch.zeros(
+            1, 1, config["srnn_params"]["z_dim"]).to(config["device"]),
+        "d_prev": torch.zeros(
+            1, 1, config["srnn_params"]["d_dim"]).to(config["device"]),
+        "u": torch.zeros(1, 1, config["x_dim"]),
+    }
+    latent_keys = ["z", "d"]
+    update_key_dict = {"z_prev": "z", "d_prev": "d"}
+
+    return data, latent_keys, update_key_dict

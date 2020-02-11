@@ -10,9 +10,9 @@ import torch
 from torch.utils import tensorboard
 
 from dataset.polydata import init_poly_dataloader
-from model.dmm import load_dmm_model
-from model.srnn import load_srnn_model
-from model.vrnn import load_vrnn_model
+from model.dmm import load_dmm_model, init_dmm_variable, get_dmm_update
+from model.srnn import load_srnn_model, init_srnn_variable, get_srnn_update
+from model.vrnn import load_vrnn_model, init_vrnn_variable, get_vrnn_update
 from utils.utils import init_logger, load_config
 
 
@@ -29,31 +29,15 @@ def data_loop(loader, model, args, config, train_mode=True):
         # Input dimension must be (timestep_size, batch_size, feature_size)
         x = x.transpose(0, 1).to(device)
         data = {"x": x}
+        minibatch_size = x.size(1)
 
         # Mask for sequencial data
         mask = torch.zeros(x.size(0), x.size(1)).to(device)
         for i, v in enumerate(seq_len):
             mask[:v, i] += 1
 
-        # Initial latent variable
-        minibatch_size = x.size(1)
-        if args.model == "dmm":
-            data.update({
-                "z_prev": torch.zeros(
-                    minibatch_size, config["dmm_params"]["z_dim"]).to(device),
-            })
-        elif args.model == "vrnn":
-            data.update({
-                "h_prev": torch.zeros(
-                    minibatch_size, config["vrnn_params"]["h_dim"]).to(device),
-            })
-        elif args.model == "srnn":
-            data.update({
-                "z_prev": torch.zeros(
-                    minibatch_size, config["srnn_params"]["z_dim"]).to(device),
-                "u": torch.cat(
-                    [torch.zeros(1, x.size(1), x.size(2)), x[:-1]]).to(device),
-            })
+        # Initialize latent variable
+        data.update(config["init_func"](minibatch_size, config, x=x))
 
         # Train / test
         if train_mode:
@@ -70,26 +54,8 @@ def data_loop(loader, model, args, config, train_mode=True):
 
 def draw_image(generate_from_prior, decoder, args, config):
 
-    device = config["device"]
-
-    if args.model == "dmm":
-        data = {"z_prev": torch.zeros(
-                    1, config["dmm_params"]["z_dim"]).to(device)}
-        latent_keys = ["z"]
-        update_key_dict = {"z_prev": "z"}
-    elif args.model == "vrnn":
-        data = {"h_prev": torch.zeros(
-                    1, config["vrnn_params"]["h_dim"]).to(device)}
-        latent_keys = ["z", "h_prev"]
-        update_key_dict = {"h_prev": "h"}
-    elif args.model == "srnn":
-        data = {"z_prev": torch.zeros(
-                    1, 1, config["srnn_params"]["z_dim"]).to(device),
-                "d_prev": torch.zeros(
-                    1, 1, config["srnn_params"]["d_dim"]).to(device),
-                "u": torch.zeros(1, 1, config["x_dim"])}
-        latent_keys = ["z", "d"]
-        update_key_dict = {"z_prev": "z", "d_prev": "d"}
+    # Get update parameters
+    data, latent_keys, update_key_dict = config["get_func"](config)
 
     x = []
     with torch.no_grad():
@@ -113,7 +79,7 @@ def draw_image(generate_from_prior, decoder, args, config):
         return x[:, None]
 
 
-def train(args, logger, config, load_model):
+def train(args, logger, config):
 
     # -------------------------------------------------------------------------
     # 1. Settings
@@ -151,7 +117,7 @@ def train(args, logger, config, load_model):
     # 3. Model
     # -------------------------------------------------------------------------
 
-    model, generate_from_prior, decoder = load_model(config)
+    model, generate_from_prior, decoder = config["load_func"](config)
 
     # -------------------------------------------------------------------------
     # 4. Training
@@ -212,18 +178,21 @@ def main():
     config = load_config(args.config)
     logger.info(f"Configs: {config}")
 
-    # Select model
-    if args.model == "dmm":
-        load_func = load_dmm_model
-    elif args.model == "vrnn":
-        load_func = load_vrnn_model
-    elif args.model == "srnn":
-        load_func = load_srnn_model
-    else:
-        raise NotImplementedError("Selected model is not implemented")
+    # Model
+    load_func = {"dmm": load_dmm_model, "vrnn": load_vrnn_model,
+                 "srnn": load_srnn_model}
+    get_func = {"dmm": get_dmm_update, "vrnn": get_vrnn_update,
+                "srnn": get_srnn_update}
+    init_func = {"dmm": init_dmm_variable, "vrnn": init_vrnn_variable,
+                 "srnn": init_srnn_variable}
+    config.update({
+        "load_func": load_func[args.model],
+        "get_func": get_func[args.model],
+        "init_func": init_func[args.model],
+    })
 
     try:
-        train(args, logger, config, load_func)
+        train(args, logger, config)
     except Exception as e:
         logger.exception(f"Run function error: {e}")
 

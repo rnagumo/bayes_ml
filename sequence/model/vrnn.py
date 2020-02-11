@@ -138,3 +138,23 @@ def load_vrnn_model(config):
     generate_from_prior = prior * decoder * recurrence
 
     return vrnn, generate_from_prior, decoder
+
+
+def init_vrnn_variable(minibatch_size, config, **kwargs):
+
+    data = {
+        "h_prev": torch.zeros(
+            minibatch_size, config["vrnn_params"]["h_dim"]
+        ).to(config["device"]),
+    }
+
+    return data
+
+
+def get_vrnn_update(config):
+    data = {"h_prev": torch.zeros(
+        1, config["vrnn_params"]["h_dim"]).to(config["device"])}
+    latent_keys = ["z", "h_prev"]
+    update_key_dict = {"h_prev": "h"}
+
+    return data, latent_keys, update_key_dict

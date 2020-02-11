@@ -130,3 +130,23 @@ def load_dmm_model(config):
     generate_from_prior = prior * decoder
 
     return dmm, generate_from_prior, decoder
+
+
+def init_dmm_variable(minibatch_size, config, **kwargs):
+
+    data = {
+        "z_prev": torch.zeros(
+            minibatch_size, config["dmm_params"]["z_dim"]
+        ).to(config["device"]),
+    }
+
+    return data
+
+
+def get_dmm_update(config):
+    data = {"z_prev": torch.zeros(
+        1, config["dmm_params"]["z_dim"]).to(config["device"])}
+    latent_keys = ["z"]
+    update_key_dict = {"z_prev": "z"}
+
+    return data, latent_keys, update_key_dict
