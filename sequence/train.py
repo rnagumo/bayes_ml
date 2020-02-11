@@ -11,10 +11,11 @@ from torch.utils import tensorboard
 
 from data.polydata import init_poly_dataloader
 from model.dmm import load_dmm_model
-from utils.utils import init_logger, plot_image_from_latent
+from model.vrnn import load_vrnn_model
+from utils.utils import init_logger
 
 
-def data_loop(loader, model, z_dim, device, train_mode=True):
+def data_loop(loader, model, device, args, train_mode=True):
 
     # Returned values
     total_loss = 0
@@ -32,13 +33,18 @@ def data_loop(loader, model, z_dim, device, train_mode=True):
 
         # Initial latent variable
         minibatch_size = x.size(1)
-        z_prev = torch.zeros(minibatch_size, z_dim).to(device)
+        if args.model == "dmm":
+            var_name = "z_prev"
+            var = torch.zeros(minibatch_size, args.z_dim).to(device)
+        elif args.model == "vrnn":
+            var_name = "h_prev"
+            var = torch.zeros(minibatch_size, args.h_dim).to(device)
 
         # Train / test
         if train_mode:
-            _loss = model.train({"x": x, "z_prev": z_prev}, mask=mask)
+            _loss = model.train({"x": x, var_name: var}, mask=mask)
         else:
-            _loss = model.test({"x": x, "z_prev": z_prev}, mask=mask)
+            _loss = model.test({"x": x, var_name: var}, mask=mask)
 
         # Add training results
         total_loss += _loss * minibatch_size
@@ -52,9 +58,10 @@ def init_args():
 
     # Direcotry settings
     group_1 = parser.add_argument_group("Directory settings")
-    group_1.add_argument("--logdir", type=str, default="../logs/tmp/")
+    group_1.add_argument("--logdir", type=str, default="../logs/seq/tmp/")
     group_1.add_argument("--root", type=str, default="../data/poly/")
     group_1.add_argument("--filename", type=str, default="JSB_Chorales.pickle")
+    group_1.add_argument("--model", type=str, default="dmm")
 
     # Model parameters
     group_2 = parser.add_argument_group("Model parameters")
@@ -127,16 +134,16 @@ def train(args, logger, load_model):
         logger.info(f"--- Epoch {epoch} ---")
 
         # Training
-        train_loss = data_loop(train_loader, model, args.z_dim, device,
+        train_loss = data_loop(train_loader, model, device, args,
                                train_mode=True)
-        valid_loss = data_loop(valid_loader, model, args.z_dim, device,
+        valid_loss = data_loop(valid_loader, model, device, args,
                                train_mode=False)
-        test_loss = data_loop(test_loader, model, args.z_dim, device,
+        test_loss = data_loop(test_loader, model, device, args,
                               train_mode=False)
 
         # Sample data
         sample = plot_image_from_latent(
-            generate_from_prior, decoder, args.z_dim, t_max, device)
+            generate_from_prior, decoder, t_max, device, args)
 
         # Log
         writer.add_scalar("train_loss", train_loss.item(), epoch)
@@ -160,8 +167,16 @@ def main():
     logger.info("Start logger")
     logger.info(f"Commant line args: {args}")
 
+    # Select model
+    if args.model == "dmm":
+        load_func = load_dmm_model
+    elif args.model == "vrnn":
+        load_func = load_vrnn_model
+    else:
+        raise NotImplementedError("Selected model is not implemented")
+
     try:
-        train(args, logger, load_dmm_model)
+        train(args, logger, load_func)
     except Exception as e:
         logger.exception(f"Run function error: {e}")
 
