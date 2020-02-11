@@ -53,6 +53,30 @@ def data_loop(loader, model, device, args, train_mode=True):
     return total_loss / total_len
 
 
+def plot_image_from_latent(generate_from_prior, decoder, t_max, device, args):
+
+    if args.model == "dmm":
+        var_name = "z"
+        var = torch.zeros(1, args.z_dim).to(device)
+    elif args.model == "vrnn":
+        var_name = "h"
+        var = torch.zeros(1, args.z_dim).to(device)
+
+    x = []
+    with torch.no_grad():
+        for _ in range(t_max):
+            # Sample
+            samples = generate_from_prior.sample({var_name + "_prev": var})
+            x_t = decoder.sample_mean({var_name: samples[var_name]})
+
+            # Update
+            var = samples[var_name]
+            x.append(x_t[None, :])
+
+        x = torch.cat(x, dim=0).transpose(0, 1)
+        return x[:, None]
+
+
 def init_args():
     parser = argparse.ArgumentParser(description="Polyphonic data training")
 
