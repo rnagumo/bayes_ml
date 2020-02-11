@@ -5,8 +5,6 @@ import logging
 import pathlib
 import time
 
-import torch
-
 
 def init_logger(path):
     """Initializes logger.
