@@ -107,9 +107,6 @@ def load_dmm_model(x_dim, t_max, device, args):
     encoder = Inference(z_dim, h_dim).to(device)
     rnn = RNN(x_dim, h_dim).to(device)
 
-    # Sampler
-    generate_from_prior = prior * decoder
-
     # Loss
     ce = pxl.CrossEntropy(encoder, decoder)
     kl = pxl.KullbackLeibler(encoder, prior)
@@ -122,5 +119,8 @@ def load_dmm_model(x_dim, t_max, device, args):
     dmm = pxm.Model(loss, distributions=[rnn, encoder, decoder, prior],
                     optimizer=optim.Adam,
                     optimizer_params={"weight_decay": args.weight_decay})
+
+    # Sampler
+    generate_from_prior = prior * decoder
 
     return dmm, generate_from_prior, decoder
