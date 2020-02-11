@@ -1,7 +1,9 @@
 {
-    "trainer_params": {
+    "anneal_params": {
         "annealing_epochs": 1000,
-        "min_factor": 0.2,
+        "min_factor": 0.2
+    },
+    "optimizer_params": {
         "weight_decay": 2.0
     },
     "dmm_params": {

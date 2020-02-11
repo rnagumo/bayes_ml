@@ -100,13 +100,9 @@ class Inference(pxd.Normal):
 
 def load_vrnn_model(x_dim, t_max, device, config):
 
-    # Config
-    model_cfg = config["vrnn_params"]
-    trainer_cfg = config["trainer_params"]
-
     # Latent dimension
-    h_dim = model_cfg["h_dim"]
-    z_dim = model_cfg["z_dim"]
+    h_dim = config["vrnn_params"]["h_dim"]
+    z_dim = config["vrnn_params"]["z_dim"]
 
     # Functions
     f_phi_x = Phi_x(x_dim, h_dim).to(device)
@@ -123,15 +119,15 @@ def load_vrnn_model(x_dim, t_max, device, config):
         encoder * recurrence, decoder)
     kl = pxl.KullbackLeibler(encoder, prior)
     _loss = KLAnnealedIterativeLoss(
-        recon, kl, trainer_cfg["annealing_epochs"], trainer_cfg["min_factor"],
-        max_iter=t_max, series_var=["x"], update_value={"h": "h_prev"})
+        recon, kl, max_iter=t_max, series_var=["x"],
+        update_value={"h": "h_prev"}, **config["anneal_params"])
     loss = _loss.mean()
 
     # Model
     vrnn = pxm.Model(
         loss, distributions=[encoder, decoder, prior, recurrence],
         optimizer=optim.Adam,
-        optimizer_params={"weight_decay": trainer_cfg["weight_decay"]})
+        optimizer_params=config["optimizer_params"])
 
     # Sampler
     generate_from_prior = prior * decoder * recurrence

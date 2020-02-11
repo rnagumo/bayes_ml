@@ -90,17 +90,13 @@ class VariationalPrior(pxd.Normal):
 
 def load_srnn_model(x_dim, t_max, device, config):
 
-    # Config
-    model_cfg = config["srnn_params"]
-    trainer_cfg = config["trainer_params"]
-
     # Input dimension
     u_dim = x_dim
 
     # Latent dimension
-    d_dim = model_cfg["d_dim"]
-    z_dim = model_cfg["z_dim"]
-    a_dim = model_cfg["a_dim"]
+    d_dim = config["srnn_params"]["d_dim"]
+    z_dim = config["srnn_params"]["z_dim"]
+    a_dim = config["srnn_params"]["a_dim"]
 
     # Distributions
     prior = Prior(z_dim, d_dim)
@@ -113,16 +109,15 @@ def load_srnn_model(x_dim, t_max, device, config):
     ce = pxl.CrossEntropy(encoder, decoder)
     kl = pxl.KullbackLeibler(encoder, prior)
     _loss = KLAnnealedIterativeLoss(
-        ce, kl, trainer_cfg["annealing_epochs"], trainer_cfg["min_factor"],
-        max_iter=t_max, series_var=["x", "d", "a"],
-        update_value={"z": "z_prev"})
+        ce, kl, max_iter=t_max, series_var=["x", "d", "a"],
+        update_value={"z": "z_prev"}, **config["anneal_params"])
     loss = _loss.expectation(brnn).expectation(frnn).mean()
 
     # Model
     dmm = pxm.Model(
         loss, distributions=[prior, frnn, decoder, brnn, encoder],
         optimizer=optim.Adam,
-        optimizer_params={"weight_decay": trainer_cfg["weight_decay"]})
+        optimizer_params=config["optimizer_params"])
 
     # Sampler
     generate_from_prior = prior * frnn * decoder
