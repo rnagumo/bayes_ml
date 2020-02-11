@@ -93,7 +93,12 @@ class RNN(pxd.Deterministic):
         return {"h": h[:, :, h.size(2) // 2:]}
 
 
-def load_dmm_model(x_dim, t_max, device, config):
+def load_dmm_model(config):
+
+    # Config params
+    x_dim = config["x_dim"]
+    t_dim = config["t_dim"]
+    device = config["device"]
 
     # Latent dimension
     h_dim = config["dmm_params"]["h_dim"]
@@ -111,7 +116,7 @@ def load_dmm_model(x_dim, t_max, device, config):
     ce = pxl.CrossEntropy(encoder, decoder)
     kl = pxl.KullbackLeibler(encoder, prior)
     _loss = KLAnnealedIterativeLoss(
-        ce, kl, max_iter=t_max, series_var=["x", "h"],
+        ce, kl, max_iter=t_dim, series_var=["x", "h"],
         update_value={"z": "z_prev"}, **config["anneal_params"])
     loss = _loss.expectation(rnn).mean()
 

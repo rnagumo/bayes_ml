@@ -88,9 +88,12 @@ class VariationalPrior(pxd.Normal):
         return {"scale": scale, "loc": loc}
 
 
-def load_srnn_model(x_dim, t_max, device, config):
+def load_srnn_model(config):
 
     # Input dimension
+    x_dim = config["x_dim"]
+    t_dim = config["t_dim"]
+    device = config["device"]
     u_dim = x_dim
 
     # Latent dimension
@@ -99,17 +102,17 @@ def load_srnn_model(x_dim, t_max, device, config):
     a_dim = config["srnn_params"]["a_dim"]
 
     # Distributions
-    prior = Prior(z_dim, d_dim)
-    frnn = ForwardRNN(u_dim, d_dim)
-    decoder = Generator(z_dim, d_dim, x_dim)
-    brnn = BackwardRNN(x_dim, d_dim, a_dim)
-    encoder = VariationalPrior(z_dim, a_dim)
+    prior = Prior(z_dim, d_dim).to(device)
+    frnn = ForwardRNN(u_dim, d_dim).to(device)
+    decoder = Generator(z_dim, d_dim, x_dim).to(device)
+    brnn = BackwardRNN(x_dim, d_dim, a_dim).to(device)
+    encoder = VariationalPrior(z_dim, a_dim).to(device)
 
     # Loss
     ce = pxl.CrossEntropy(encoder, decoder)
     kl = pxl.KullbackLeibler(encoder, prior)
     _loss = KLAnnealedIterativeLoss(
-        ce, kl, max_iter=t_max, series_var=["x", "d", "a"],
+        ce, kl, max_iter=t_dim, series_var=["x", "d", "a"],
         update_value={"z": "z_prev"}, **config["anneal_params"])
     loss = _loss.expectation(brnn).expectation(frnn).mean()
 

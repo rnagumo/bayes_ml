@@ -16,7 +16,9 @@ from model.vrnn import load_vrnn_model
 from utils.utils import init_logger, load_config
 
 
-def data_loop(loader, model, device, args, config, train_mode=True):
+def data_loop(loader, model, args, config, train_mode=True):
+
+    device = config["device"]
 
     # Returned values
     total_loss = 0
@@ -66,8 +68,9 @@ def data_loop(loader, model, device, args, config, train_mode=True):
     return total_loss / total_len
 
 
-def plot_image_from_latent(generate_from_prior, decoder, t_max, device, args,
-                           config, x_dim):
+def draw_image(generate_from_prior, decoder, args, config):
+
+    device = config["device"]
 
     if args.model == "dmm":
         data = {"z_prev": torch.zeros(
@@ -84,13 +87,13 @@ def plot_image_from_latent(generate_from_prior, decoder, t_max, device, args,
                     1, 1, config["srnn_params"]["z_dim"]).to(device),
                 "d_prev": torch.zeros(
                     1, 1, config["srnn_params"]["d_dim"]).to(device),
-                "u": torch.zeros(1, 1, x_dim)}
+                "u": torch.zeros(1, 1, config["x_dim"])}
         latent_keys = ["z", "d"]
         update_key_dict = {"z_prev": "z", "d_prev": "d"}
 
     x = []
     with torch.no_grad():
-        for _ in range(t_max):
+        for _ in range(config["t_dim"]):
             # Sample
             samples = generate_from_prior.sample(data)
             x_t = decoder.sample_mean({k: samples[k] for k in latent_keys})
@@ -120,6 +123,7 @@ def train(args, logger, config, load_model):
     use_cuda = args.cuda and torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     torch.manual_seed(args.seed)
+    config["device"] = device
 
     # Tensorboard writer
     writer = tensorboard.SummaryWriter(args.logdir)
@@ -140,14 +144,14 @@ def train(args, logger, config, load_model):
 
     # Data dimension (seq_len, batch_size, input_size)
     x_dim = train_loader.dataset.data.size(2)
-    t_max = train_loader.dataset.data.size(0)
+    t_dim = train_loader.dataset.data.size(0)
+    config.update({"x_dim": x_dim, "t_dim": t_dim})
 
     # -------------------------------------------------------------------------
     # 3. Model
     # -------------------------------------------------------------------------
 
-    model, generate_from_prior, decoder = load_model(
-        x_dim, t_max, device, config)
+    model, generate_from_prior, decoder = load_model(config)
 
     # -------------------------------------------------------------------------
     # 4. Training
@@ -157,16 +161,12 @@ def train(args, logger, config, load_model):
         logger.info(f"--- Epoch {epoch} ---")
 
         # Training
-        train_loss = data_loop(train_loader, model, device, args, config,
-                               train_mode=True)
-        valid_loss = data_loop(valid_loader, model, device, args, config,
-                               train_mode=False)
-        test_loss = data_loop(test_loader, model, device, args, config,
-                              train_mode=False)
+        train_loss = data_loop(train_loader, model, args, config, True)
+        valid_loss = data_loop(valid_loader, model, args, config, False)
+        test_loss = data_loop(test_loader, model, args, config, False)
 
         # Sample data
-        sample = plot_image_from_latent(
-            generate_from_prior, decoder, t_max, device, args, config, x_dim)
+        sample = draw_image(generate_from_prior, decoder, args, config)
 
         # Log
         writer.add_scalar("train_loss", train_loss.item(), epoch)

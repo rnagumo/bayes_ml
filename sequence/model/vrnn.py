@@ -98,7 +98,12 @@ class Inference(pxd.Normal):
         return {"loc": loc, "scale": scale}
 
 
-def load_vrnn_model(x_dim, t_max, device, config):
+def load_vrnn_model(config):
+
+    # Config params
+    x_dim = config["x_dim"]
+    t_dim = config["t_dim"]
+    device = config["device"]
 
     # Latent dimension
     h_dim = config["vrnn_params"]["h_dim"]
@@ -119,7 +124,7 @@ def load_vrnn_model(x_dim, t_max, device, config):
         encoder * recurrence, decoder)
     kl = pxl.KullbackLeibler(encoder, prior)
     _loss = KLAnnealedIterativeLoss(
-        recon, kl, max_iter=t_max, series_var=["x"],
+        recon, kl, max_iter=t_dim, series_var=["x"],
         update_value={"h": "h_prev"}, **config["anneal_params"])
     loss = _loss.mean()
 
