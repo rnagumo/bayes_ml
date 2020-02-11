@@ -57,7 +57,7 @@ class InferenceShuffleDim(pxd.Deterministic):
 
     def forward(self, x_shf):
         z = self.q.sample({"x": x_shf}, return_all=False)["z"]
-        return {"z": z[:, torch.randperm(z.shape[1])]}
+        return {"z": z[:, torch.randperm(z.size(1))]}
 
 
 class Discriminator(pxd.Deterministic):
@@ -83,7 +83,7 @@ def data_loop(loader, model, tc, device, train_mode):
     d_loss = 0
     for x, _ in tqdm.tqdm(loader):
         x = x.to(device)
-        len_x = x.shape[0] // 2
+        len_x = x.size(0) // 2
 
         if train_mode:
             loss += model.train({"x": x[:len_x], "x_shf": x[len_x:]})
@@ -141,8 +141,9 @@ def init_args():
     parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--cuda", action="store_true")
     parser.add_argument("--seed", type=int, default=1)
-    parser.add_argument("--z-dim", type=int, default=8)
-    parser.add_argument("--plot-dim", type=int, default=8)
+    parser.add_argument("--z-dim", type=int, default=64)
+    parser.add_argument("--plot-num", type=int, default=64)
+    parser.add_argument("--plot-recon", type=int, default=8)
 
     return parser.parse_args()
 
@@ -184,14 +185,7 @@ def main():
     z_dim = args.z_dim
 
     # Dummy latent variable
-    plot_dim = args.plot_dim
-    z_sample = []
-    for i in range(plot_dim):
-        z_batch = torch.zeros(plot_dim, z_dim)
-        z_batch[:, i] = ((torch.arange(plot_dim, dtype=torch.float32) * 2)
-                         / (plot_dim - 1) - 1)
-        z_sample.append(z_batch)
-    z_sample = torch.cat(z_sample, dim=0).to(device)
+    z_sample = 0.5 * torch.randn(args.plot_num, z_dim).to(device)
 
     # -------------------------------------------------------------------------
     # 3. Pixyz classses
@@ -229,7 +223,8 @@ def main():
                                            train_mode=False)
 
         # Sample data
-        recon = plot_reconstruction(_x[:plot_dim], q, p, image_dim, image_dim)
+        recon = plot_reconstruction(
+            _x[:args.plot_recon], q, p, image_dim, image_dim)
         sample = plot_image_from_latent(z_sample, p, image_dim, image_dim)
 
         # Log
