@@ -114,7 +114,15 @@ def load_srnn_model(config):
     _loss = KLAnnealedIterativeLoss(
         ce, kl, max_iter=t_dim, series_var=["x", "d", "a"],
         update_value={"z": "z_prev"}, **config["anneal_params"])
-    loss = _loss.expectation(brnn).expectation(frnn).mean()
+
+    # Calculate batch loss
+    # 1. Forward latent d_{1:T} = frnn(x_{1:T})
+    # 2. Backward latent a_{1:T} = brnn(d_{1:T})
+    # 3. Latent z_{1:T} from both generative model and variational model
+    _loss_batch = _loss.expectation(brnn).expectation(frnn)
+
+    # Mean for batch
+    loss = _loss_batch.mean()
 
     # Model
     dmm = pxm.Model(
