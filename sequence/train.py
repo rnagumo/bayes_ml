@@ -96,6 +96,7 @@ def train(args, logger, config):
 
     # Tensorboard writer
     writer = tensorboard.SummaryWriter(args.logdir)
+    config["writer"] = writer
 
     # -------------------------------------------------------------------------
     # 2. Data
@@ -138,14 +139,25 @@ def train(args, logger, config):
         sample = draw_image(generate_from_prior, decoder, args, config)
 
         # Log
-        writer.add_scalar("train_loss", train_loss.item(), epoch)
-        writer.add_scalar("valid_loss", valid_loss.item(), epoch)
-        writer.add_scalar("test_loss", test_loss.item(), epoch)
+        writer.add_scalar("Loss/train_loss", train_loss.item(), epoch)
+        writer.add_scalar("Loss/valid_loss", valid_loss.item(), epoch)
+        writer.add_scalar("Loss/test_loss", test_loss.item(), epoch)
         writer.add_images("image_from_latent", sample, epoch)
 
         logger.info(f"Train loss = {train_loss.item()}")
         logger.info(f"Valid loss = {valid_loss.item()}")
         logger.info(f"Test loss = {test_loss.item()}")
+
+    # Log hyper-parameters
+    hparam_dict = vars(args)
+    for key, d in config.items():
+        if "_params" in key:
+            hparam_dict.update(d)
+
+    metric_dict = {"train_loss": train_loss.item(),
+                   "valid_loss": valid_loss.item(),
+                   "test_loss": test_loss.item()}
+    writer.add_hparams(hparam_dict, metric_dict)
 
     writer.close()
 
