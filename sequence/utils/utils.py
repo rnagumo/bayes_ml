@@ -23,12 +23,8 @@ def init_logger(path):
         Logger
     """
 
-    log_dir = pathlib.Path(path)
-    if not log_dir.exists():
-        log_dir.mkdir()
-
     log_fn = "training_{}.log".format(time.strftime("%Y%m%d"))
-    log_path = log_dir.joinpath(log_fn)
+    log_path = pathlib.Path(path, log_fn)
 
     # Initialize logger
     logger = logging.getLogger()
@@ -52,8 +48,35 @@ def init_logger(path):
 
 
 def load_config(path):
+    """Loads config json file.
+
+    Parameters
+    ----------
+    path : str
+        Path to json file
+
+    Returns
+    -------
+    config : dict
+        Config dict
+    """
 
     with pathlib.Path(path).open() as f:
         config = json.load(f)
 
     return config
+
+
+def check_logdir(path):
+    """Checks existence of logdir and mkdir.
+
+    Parameters
+    ----------
+    path : str
+        Path to logdir
+    """
+
+    path = pathlib.Path(path)
+
+    if not path.exists():
+        path.mkdir(parents=True)

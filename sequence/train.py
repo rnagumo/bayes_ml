@@ -13,7 +13,7 @@ from dataset.polydata import init_poly_dataloader
 from model.dmm import load_dmm_model, init_dmm_variable, get_dmm_update
 from model.srnn import load_srnn_model, init_srnn_variable, get_srnn_update
 from model.vrnn import load_vrnn_model, init_vrnn_variable, get_vrnn_update
-from utils.utils import init_logger, load_config
+from utils.utils import init_logger, load_config, check_logdir
 
 
 def data_loop(epoch, loader, model, args, config, train_mode=True):
@@ -75,7 +75,10 @@ def draw_image(generate_from_prior, decoder, args, config):
             else:
                 x.append(x_t[None, :])
 
+        # Data of size (batch_size, seq_len, input_size)
         x = torch.cat(x).transpose(0, 1)
+
+        # Return data of size (1, batch_size, seq_len, input_size)
         return x[:, None]
 
 
@@ -168,6 +171,9 @@ def init_args():
 def main():
     # Args
     args = init_args()
+
+    # Make logdir
+    check_logdir(args.logdir)
 
     # Logger
     logger = init_logger(args.logdir)
