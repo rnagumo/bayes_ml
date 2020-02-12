@@ -116,9 +116,11 @@ def load_srnn_model(config):
         update_value={"z": "z_prev"}, **config["anneal_params"])
 
     # Calculate batch loss
-    # 1. Forward latent d_{1:T} = frnn(x_{1:T})
-    # 2. Backward latent a_{1:T} = brnn(d_{1:T})
-    # 3. Latent z_{1:T} from both generative model and variational model
+    # 1. Calculate Forward latent d_{1:T} = frnn(x_{1:T})
+    # 2. Calculate Backward latent a_{1:T} = brnn(d_{1:T})
+    # 3. Sample latent z_{1:T}, observable x_{1:T} from both
+    #      - generative p(z_t|z_{t-1}, d_t) & p(x_t|z_t, d_t)
+    #      - variational q(z_t|z_{t-1}, a_t)
     _loss_batch = _loss.expectation(brnn).expectation(frnn)
 
     # Mean for batch
