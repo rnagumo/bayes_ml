@@ -41,9 +41,11 @@ def data_loop(epoch, loader, model, args, config, train_mode=True):
 
         # Train / test
         if train_mode:
-            _loss = model.train(data, mask=mask, epoch=epoch)
+            _loss = model.train(data, mask=mask, epoch=epoch,
+                                writer=config["writer"])
         else:
-            _loss = model.test(data, mask=mask, epoch=epoch)
+            _loss = model.test(data, mask=mask, epoch=epoch,
+                               writer=config["writer"])
 
         # Add training results
         total_loss += _loss * minibatch_size
