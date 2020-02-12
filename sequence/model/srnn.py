@@ -143,7 +143,7 @@ def init_srnn_variable(minibatch_size, config, x, **kwargs):
             minibatch_size, config["srnn_params"]["z_dim"]
         ).to(config["device"]),
         "u": torch.cat(
-            [torch.zeros(1, minibatch_size, config["x_dim"]), x[:-1]]
+            [torch.zeros(1, minibatch_size, config["x_dim"]), x[:-1].cpu()]
         ).to(config["device"]),
     }
 
@@ -156,7 +156,7 @@ def get_srnn_update(config):
             1, 1, config["srnn_params"]["z_dim"]).to(config["device"]),
         "d_prev": torch.zeros(
             1, 1, config["srnn_params"]["d_dim"]).to(config["device"]),
-        "u": torch.zeros(1, 1, config["x_dim"]),
+        "u": torch.zeros(1, 1, config["x_dim"]).to(config["device"]),
     }
     latent_keys = ["z", "d"]
     update_key_dict = {"z_prev": "z", "d_prev": "d"}
