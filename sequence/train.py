@@ -12,6 +12,7 @@ from torch.utils import tensorboard
 from dataset.polydata import init_poly_dataloader
 from model.dmm import load_dmm_model, init_dmm_variable, get_dmm_update
 from model.srnn import load_srnn_model, init_srnn_variable, get_srnn_update
+from model.storn import load_storn_model, init_storn_variable, get_storn_update
 from model.vrnn import load_vrnn_model, init_vrnn_variable, get_vrnn_update
 from utils.utils import init_logger, load_config, check_logdir
 
@@ -200,11 +201,11 @@ def main():
 
     # Model
     load_func = {"dmm": load_dmm_model, "vrnn": load_vrnn_model,
-                 "srnn": load_srnn_model}
+                 "srnn": load_srnn_model, "storn": load_storn_model}
     get_func = {"dmm": get_dmm_update, "vrnn": get_vrnn_update,
-                "srnn": get_srnn_update}
+                "srnn": get_srnn_update, "storn": get_storn_update}
     init_func = {"dmm": init_dmm_variable, "vrnn": init_vrnn_variable,
-                 "srnn": init_srnn_variable}
+                 "srnn": init_srnn_variable, "storn": init_storn_variable}
     config.update({
         "load_func": load_func[args.model],
         "get_func": get_func[args.model],
