@@ -126,13 +126,10 @@ def load_dmm_model(config):
         optimizer=optim.Adam,
         optimizer_params=config["optimizer_params"])
 
-    # Sampler
-    generate_from_prior = prior * decoder
-
-    return dmm, generate_from_prior, decoder
+    return dmm, (prior, decoder)
 
 
-def init_dmm_variable(minibatch_size, config, **kwargs):
+def init_dmm_var(minibatch_size, config, **kwargs):
 
     data = {
         "z_prev": torch.zeros(
@@ -143,10 +140,14 @@ def init_dmm_variable(minibatch_size, config, **kwargs):
     return data
 
 
-def get_dmm_update(config):
-    data = {"z_prev": torch.zeros(
-        1, config["dmm_params"]["z_dim"]).to(config["device"])}
-    latent_keys = ["z"]
-    update_key_dict = {"z_prev": "z"}
+def get_dmm_sample(sampler, data):
+    prior, decoder = sampler
 
-    return data, latent_keys, update_key_dict
+    # Sample x_t
+    x_t_z_t = (prior * decoder).sample(data)
+    x_t = decoder.sample_mean({"z": x_t_z_t["z"]})
+
+    # Update z_t
+    data["z_prev"] = x_t_z_t["z"]
+
+    return x_t, data

@@ -10,7 +10,7 @@ import torch
 from torch.utils import tensorboard
 
 from dataset.polydata import init_poly_dataloader
-from model.dmm import load_dmm_model, init_dmm_variable, get_dmm_update
+from model.dmm import load_dmm_model, init_dmm_var, get_dmm_sample
 from model.srnn import load_srnn_model, init_srnn_variable, get_srnn_update
 from model.storn import load_storn_model, init_storn_variable, get_storn_update
 from model.vrnn import load_vrnn_model, init_vrnn_variable, get_vrnn_update
@@ -55,21 +55,16 @@ def data_loop(epoch, loader, model, args, config, train_mode=True):
     return total_loss / total_len
 
 
-def draw_image(generate_from_prior, decoder, args, config):
+def draw_image(sampler, args, config):
 
     # Get update parameters
-    data, latent_keys, update_key_dict = config["get_func"](config)
+    data = config["init_func"](1, config)
 
     x = []
     with torch.no_grad():
         for _ in range(config["t_dim"]):
             # Sample
-            samples = generate_from_prior.sample(data)
-            x_t = decoder.sample_mean({k: samples[k] for k in latent_keys})
-
-            # Update
-            for key, var_name in update_key_dict.items():
-                data[key] = samples[var_name]
+            x_t, data = config["get_func"](sampler, data)
 
             # Add to data list
             if args.model == "srnn":
@@ -124,7 +119,7 @@ def train(args, logger, config):
     # 3. Model
     # -------------------------------------------------------------------------
 
-    model, generate_from_prior, decoder = config["load_func"](config)
+    model, sampler = config["load_func"](config)
 
     # -------------------------------------------------------------------------
     # 4. Training
@@ -139,7 +134,7 @@ def train(args, logger, config):
         test_loss = data_loop(epoch, test_loader, model, args, config, False)
 
         # Sample data
-        sample = draw_image(generate_from_prior, decoder, args, config)
+        sample = draw_image(sampler, args, config)
 
         # Log
         writer.add_scalar("Loss/train_loss", train_loss.item(), epoch)
@@ -202,9 +197,9 @@ def main():
     # Model
     load_func = {"dmm": load_dmm_model, "vrnn": load_vrnn_model,
                  "srnn": load_srnn_model, "storn": load_storn_model}
-    get_func = {"dmm": get_dmm_update, "vrnn": get_vrnn_update,
+    get_func = {"dmm": get_dmm_sample, "vrnn": get_vrnn_update,
                 "srnn": get_srnn_update, "storn": get_storn_update}
-    init_func = {"dmm": init_dmm_variable, "vrnn": init_vrnn_variable,
+    init_func = {"dmm": init_dmm_var, "vrnn": init_vrnn_variable,
                  "srnn": init_srnn_variable, "storn": init_storn_variable}
     config.update({
         "load_func": load_func[args.model],
