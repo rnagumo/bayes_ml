@@ -84,42 +84,50 @@ def load_storn_model(config):
         **config["anneal_params"])
     loss = _loss.expectation(irnn).mean()
 
-    print((ce + kl).input_var)
-
     # Model
     storn = pxm.Model(
         loss, distributions=[prior, decoder, irnn, encoder],
         optimizer=optim.Adam,
         optimizer_params=config["optimizer_params"])
 
-    # Sampler
-    generate_from_prior = decoder
-
-    return storn, generate_from_prior, decoder
+    return storn, (decoder, prior)
 
 
-def init_storn_variable(minibatch_size, config, x, **kwargs):
+def init_storn_var(minibatch_size, config, x=None, **kwargs):
 
-    data = {
-        "h_prev": torch.zeros(
-            minibatch_size, config["storn_params"]["h_dim"]
-        ).to(config["device"]),
-        "u": torch.cat(
-            [torch.zeros(1, minibatch_size, config["x_dim"]), x[:-1].cpu()]
-        ).to(config["device"]),
-    }
+    if x is not None:
+        data = {
+            "h_prev": torch.zeros(
+                minibatch_size, config["storn_params"]["h_dim"]
+            ).to(config["device"]),
+            "u": torch.cat(
+                [torch.zeros(1, minibatch_size, config["x_dim"]), x[:-1].cpu()]
+            ).to(config["device"]),
+        }
+    else:
+        data = {
+            "h_prev": torch.zeros(
+                minibatch_size, config["storn_params"]["h_dim"]
+            ).to(config["device"]),
+            "u": torch.zeros(
+                minibatch_size, config["x_dim"]).to(config["device"]),
+            "z": torch.randn(
+                minibatch_size, config["z_dim"]).to(config["device"]),
+        }
 
     return data
 
 
-def get_storn_update(config):
-    # Input data for 1 time step
-    data = {
-        "z": torch.randn(1, config["z_dim"]).to(config["device"]),
-        "u": torch.zeros(1, config["x_dim"]).to(config["device"]),
-        "h_prev": torch.zeros(
-            1, config["storn_params"]["h_dim"]).to(config["device"]),
-    }
+def get_storn_sample(sampler, data):
+
+    # TODO: wrong method
+    decoder, prior = sampler
+
+    # Sample x_t
+    x_t = (decoder * prior).sample(data)
+
+    # Update h_t
+
     latent_keys = ["z", "h_prev"]
     update_key_dict = {"h_prev": "h"}
 

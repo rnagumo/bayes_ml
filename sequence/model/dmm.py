@@ -144,10 +144,10 @@ def get_dmm_sample(sampler, data):
     prior, decoder = sampler
 
     # Sample x_t
-    x_t_z_t = (prior * decoder).sample(data)
-    x_t = decoder.sample_mean({"z": x_t_z_t["z"]})
+    sample = (prior * decoder).sample(data)
+    x_t = decoder.sample_mean({"z": sample["z"]})
 
     # Update z_t
-    data["z_prev"] = x_t_z_t["z"]
+    data["z_prev"] = sample["z"]
 
-    return x_t, data
+    return x_t[None, :], data

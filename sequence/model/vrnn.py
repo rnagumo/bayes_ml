@@ -134,13 +134,10 @@ def load_vrnn_model(config):
         optimizer=optim.Adam,
         optimizer_params=config["optimizer_params"])
 
-    # Sampler
-    generate_from_prior = prior * decoder * recurrence
-
-    return vrnn, generate_from_prior, decoder
+    return vrnn, (prior, recurrence, decoder)
 
 
-def init_vrnn_variable(minibatch_size, config, **kwargs):
+def init_vrnn_var(minibatch_size, config, **kwargs):
 
     data = {
         "h_prev": torch.zeros(
@@ -151,10 +148,14 @@ def init_vrnn_variable(minibatch_size, config, **kwargs):
     return data
 
 
-def get_vrnn_update(config):
-    data = {"h_prev": torch.zeros(
-        1, config["vrnn_params"]["h_dim"]).to(config["device"])}
-    latent_keys = ["z", "h_prev"]
-    update_key_dict = {"h_prev": "h"}
+def get_vrnn_sample(sampler, data):
+    prior, recurrence, decoder = sampler
 
-    return data, latent_keys, update_key_dict
+    # Sample x_t
+    sample = (prior * decoder * recurrence).sample(data)
+    x_t = decoder.sample_mean({"z": sample["z"], "h_prev": sample["h"]})
+
+    # Update h_t
+    data["h_prev"] = sample["h"]
+
+    return x_t[None, :], data

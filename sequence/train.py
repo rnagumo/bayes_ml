@@ -11,9 +11,9 @@ from torch.utils import tensorboard
 
 from dataset.polydata import init_poly_dataloader
 from model.dmm import load_dmm_model, init_dmm_var, get_dmm_sample
-from model.srnn import load_srnn_model, init_srnn_variable, get_srnn_update
-from model.storn import load_storn_model, init_storn_variable, get_storn_update
-from model.vrnn import load_vrnn_model, init_vrnn_variable, get_vrnn_update
+from model.srnn import load_srnn_model, init_srnn_var, get_srnn_sample
+from model.storn import load_storn_model, init_storn_var, get_storn_sample
+from model.vrnn import load_vrnn_model, init_vrnn_var, get_vrnn_sample
 from utils.utils import init_logger, load_config, check_logdir
 
 
@@ -64,14 +64,10 @@ def draw_image(sampler, args, config):
     with torch.no_grad():
         for _ in range(config["t_dim"]):
             # Sample
-            x_t, data = config["get_func"](sampler, data)
+            x_t, data = config["sample_func"](sampler, data)
 
             # Add to data list
-            if args.model == "srnn":
-                data["u"] = x_t
-                x.append(x_t)
-            else:
-                x.append(x_t[None, :])
+            x.append(x_t)
 
         # Data of size (batch_size, seq_len, input_size)
         x = torch.cat(x).transpose(0, 1)
@@ -197,14 +193,14 @@ def main():
     # Model
     load_func = {"dmm": load_dmm_model, "vrnn": load_vrnn_model,
                  "srnn": load_srnn_model, "storn": load_storn_model}
-    get_func = {"dmm": get_dmm_sample, "vrnn": get_vrnn_update,
-                "srnn": get_srnn_update, "storn": get_storn_update}
-    init_func = {"dmm": init_dmm_var, "vrnn": init_vrnn_variable,
-                 "srnn": init_srnn_variable, "storn": init_storn_variable}
+    init_func = {"dmm": init_dmm_var, "vrnn": init_vrnn_var,
+                 "srnn": init_srnn_var, "storn": init_storn_var}
+    sample_func = {"dmm": get_dmm_sample, "vrnn": get_vrnn_sample,
+                   "srnn": get_srnn_sample, "storn": get_storn_sample}
     config.update({
         "load_func": load_func[args.model],
-        "get_func": get_func[args.model],
         "init_func": init_func[args.model],
+        "sample_func": sample_func[args.model],
     })
 
     try:

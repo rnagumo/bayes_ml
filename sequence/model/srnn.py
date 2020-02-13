@@ -132,35 +132,45 @@ def load_srnn_model(config):
         optimizer=optim.Adam,
         optimizer_params=config["optimizer_params"])
 
-    # Sampler
-    generate_from_prior = prior * frnn * decoder
-
-    return dmm, generate_from_prior, decoder
+    return dmm, (prior, frnn, decoder)
 
 
-def init_srnn_variable(minibatch_size, config, x, **kwargs):
+def init_srnn_var(minibatch_size, config, x=None, **kwargs):
 
-    data = {
-        "z_prev": torch.zeros(
-            minibatch_size, config["srnn_params"]["z_dim"]
-        ).to(config["device"]),
-        "u": torch.cat(
-            [torch.zeros(1, minibatch_size, config["x_dim"]), x[:-1].cpu()]
-        ).to(config["device"]),
-    }
+    if x is not None:
+        data = {
+            "z_prev": torch.zeros(
+                minibatch_size, config["srnn_params"]["z_dim"]
+            ).to(config["device"]),
+            "u": torch.cat(
+                [torch.zeros(1, minibatch_size, config["x_dim"]), x[:-1].cpu()]
+            ).to(config["device"]),
+        }
+    else:
+        data = {
+            "z_prev": torch.zeros(
+                1, minibatch_size, config["srnn_params"]["z_dim"]
+            ).to(config["device"]),
+            "d_prev": torch.zeros(
+                1, minibatch_size, config["srnn_params"]["d_dim"]
+            ).to(config["device"]),
+            "u": torch.zeros(
+                1, minibatch_size, config["x_dim"]).to(config["device"]),
+        }
 
     return data
 
 
-def get_srnn_update(config):
-    data = {
-        "z_prev": torch.zeros(
-            1, 1, config["srnn_params"]["z_dim"]).to(config["device"]),
-        "d_prev": torch.zeros(
-            1, 1, config["srnn_params"]["d_dim"]).to(config["device"]),
-        "u": torch.zeros(1, 1, config["x_dim"]).to(config["device"]),
-    }
-    latent_keys = ["z", "d"]
-    update_key_dict = {"z_prev": "z", "d_prev": "d"}
+def get_srnn_sample(sampler, data):
+    prior, frnn, decoder = sampler
 
-    return data, latent_keys, update_key_dict
+    # Sample x_t
+    sample = (prior * frnn * decoder).sample(data)
+    x_t = decoder.sample_mean({"z": sample["z"], "d": sample["d"]})
+
+    # Update
+    data["z_prev"] = sample["z"]
+    data["d_prev"] = sample["d"]
+    data["u"] = x_t
+
+    return x_t, data
