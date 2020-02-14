@@ -15,26 +15,26 @@ import pixyz.losses as pxl
 import pixyz.models as pxm
 
 from .iteration_loss import KLAnnealedIterativeLoss
+from .time_expectation import TimeSeriesExpectation
 
 
 class ForwardRNN(pxd.Deterministic):
     def __init__(self, u_dim, d_dim):
-        super().__init__(cond_var=["u"], var=["d"])
+        super().__init__(cond_var=["u", "d_prev"], var=["d"])
 
-        self.rnn = nn.GRU(u_dim, d_dim)
+        self.rnn_cell = nn.GRUCell(u_dim, d_dim)
         self.d0 = nn.Parameter(torch.zeros(1, 1, d_dim))
 
-    def forward(self, u):
-        d0 = self.d0.expand(1, u.size(1), self.d0.size(2)).contiguous()
-        d, _ = self.rnn(u, d0)
+    def forward(self, u, d_prev):
+        d = self.rnn_cell(u, d_prev)
         return {"d": d}
 
 
 class Prior(pxd.Normal):
-    def __init__(self, z_dim, d_dim):
+    def __init__(self, d_dim, z_dim):
         super().__init__(cond_var=["z_prev", "d"], var=["z"])
 
-        self.fc1 = nn.Linear(z_dim + d_dim, 512)
+        self.fc1 = nn.Linear(d_dim + z_dim, 512)
         self.fc21 = nn.Linear(512, z_dim)
         self.fc22 = nn.Linear(512, z_dim)
 
@@ -102,8 +102,8 @@ def load_srnn_model(config):
     a_dim = config["srnn_params"]["a_dim"]
 
     # Distributions
-    prior = Prior(z_dim, d_dim).to(device)
     frnn = ForwardRNN(u_dim, d_dim).to(device)
+    prior = Prior(d_dim, z_dim).to(device)
     decoder = Generator(z_dim, d_dim, x_dim).to(device)
     brnn = BackwardRNN(x_dim, d_dim, a_dim).to(device)
     encoder = VariationalPrior(z_dim, a_dim).to(device)
@@ -115,13 +115,12 @@ def load_srnn_model(config):
         ce, kl, max_iter=t_dim, series_var=["x", "d", "a"],
         update_value={"z": "z_prev"}, **config["anneal_params"])
 
-    # Calculate batch loss
-    # 1. Calculate Forward latent d_{1:T} = frnn(x_{1:T})
-    # 2. Calculate Backward latent a_{1:T} = brnn(d_{1:T})
-    # 3. Sample latent z_{1:T}, observable x_{1:T} from both
-    #      - generative p(z_t|z_{t-1}, d_t) & p(x_t|z_t, d_t)
-    #      - variational q(z_t|z_{t-1}, a_t)
-    _loss_batch = _loss.expectation(brnn).expectation(frnn)
+    # Calculate Backward latent a_{1:T} = brnn(d_{1:T})
+    _loss_batch_obs = _loss.expectation(brnn)
+
+    # Calculate Forward latent d_{1:T} = frnn(x_{1:T})
+    _loss_batch = TimeSeriesExpectation(
+        frnn, _loss_batch_obs, series_var=["u"], update_value={"d": "d_prev"})
 
     # Mean for batch
     loss = _loss_batch.mean()
@@ -142,6 +141,9 @@ def init_srnn_var(minibatch_size, config, x=None, **kwargs):
             "z_prev": torch.zeros(
                 minibatch_size, config["srnn_params"]["z_dim"]
             ).to(config["device"]),
+            "d_prev": torch.zeros(
+                minibatch_size, config["srnn_params"]["d_dim"]
+            ).to(config["device"]),
             "u": torch.cat(
                 [torch.zeros(1, minibatch_size, config["x_dim"]), x[:-1].cpu()]
             ).to(config["device"]),
@@ -149,13 +151,13 @@ def init_srnn_var(minibatch_size, config, x=None, **kwargs):
     else:
         data = {
             "z_prev": torch.zeros(
-                1, minibatch_size, config["srnn_params"]["z_dim"]
+                minibatch_size, config["srnn_params"]["z_dim"]
             ).to(config["device"]),
             "d_prev": torch.zeros(
-                1, minibatch_size, config["srnn_params"]["d_dim"]
+                minibatch_size, config["srnn_params"]["d_dim"]
             ).to(config["device"]),
             "u": torch.zeros(
-                1, minibatch_size, config["x_dim"]).to(config["device"]),
+                minibatch_size, config["x_dim"]).to(config["device"]),
         }
 
     return data
@@ -173,4 +175,4 @@ def get_srnn_sample(sampler, data):
     data["d_prev"] = sample["d"]
     data["u"] = x_t
 
-    return x_t, data
+    return x_t[None, :], data
