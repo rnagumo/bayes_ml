@@ -17,17 +17,26 @@ import pixyz.models as pxm
 from .iteration_loss import KLAnnealedIterativeLoss
 
 
-class Generator(pxd.Bernoulli):
-    def __init__(self, z_dim, u_dim, h_dim, x_dim):
-        super().__init__(cond_var=["z", "u", "h_prev"], var=["x"])
+class GeneratorRNN(pxd.Deterministic):
+    def __init__(self, z_dim, u_dim, h_dim):
+        super().__init__(cond_var=["z", "u", "h_prev"], var=["h"])
 
         self.rnn_cell = nn.RNNCell(z_dim + u_dim, h_dim)
+
+    def forward(self, z, u, h_prev):
+        h = self.rnn_cell(torch.cat([z, u], dim=-1), h_prev)
+        return {"h": h}
+
+
+class Generator(pxd.Bernoulli):
+    def __init__(self, h_dim, x_dim):
+        super().__init__(cond_var=["h"], var=["x"])
+
         self.fc1 = nn.Linear(h_dim, 512)
         self.fc2 = nn.Linear(512, 256)
         self.fc3 = nn.Linear(256, x_dim)
 
-    def forward(self, z, u, h_prev):
-        h = self.rnn_cell(torch.cat([z, u], dim=-1), h_prev)
+    def forward(self, h):
         h = F.relu(self.fc1(h))
         h = F.relu(self.fc2(h))
         probs = torch.sigmoid(self.fc3(h))
@@ -70,27 +79,29 @@ def load_storn_model(config):
     z_dim = config["storn_params"]["z_dim"]
 
     # Distributions
-    prior = pxd.Normal(loc=torch.tensor(0.), scale=torch.tensor(1.),
-                       var=["z"]).to(device)
-    decoder = Generator(z_dim, u_dim, h_dim, x_dim).to(device)
+    prior = pxd.Normal(
+        loc=torch.tensor(0.), scale=torch.tensor(1.), var=["z"],
+        features_shape=torch.Size([z_dim])).to(device)
+    grnn = GeneratorRNN(z_dim, u_dim, h_dim).to(device)
+    decoder = Generator(h_dim, x_dim).to(device)
     irnn = InferenceRNN(x_dim, z_dim).to(device)
     encoder = Inference().to(device)
 
     # Loss
-    ce = pxl.CrossEntropy(encoder, decoder)
+    ce = pxl.CrossEntropy(grnn * encoder, decoder)
     kl = pxl.KullbackLeibler(encoder, prior)
     _loss = KLAnnealedIterativeLoss(
         ce, kl, max_iter=t_dim, series_var=["x", "u", "h_v"],
-        **config["anneal_params"])
+        update_value={"h": "h_prev"}, **config["anneal_params"])
     loss = _loss.expectation(irnn).mean()
 
     # Model
     storn = pxm.Model(
-        loss, distributions=[prior, decoder, irnn, encoder],
+        loss, distributions=[prior, grnn, decoder, irnn, encoder],
         optimizer=optim.Adam,
         optimizer_params=config["optimizer_params"])
 
-    return storn, (decoder, prior)
+    return storn, (decoder, grnn, prior)
 
 
 def init_storn_var(minibatch_size, config, x=None, **kwargs):
@@ -111,8 +122,6 @@ def init_storn_var(minibatch_size, config, x=None, **kwargs):
             ).to(config["device"]),
             "u": torch.zeros(
                 minibatch_size, config["x_dim"]).to(config["device"]),
-            "z": torch.randn(
-                minibatch_size, config["z_dim"]).to(config["device"]),
         }
 
     return data
@@ -121,14 +130,14 @@ def init_storn_var(minibatch_size, config, x=None, **kwargs):
 def get_storn_sample(sampler, data):
 
     # TODO: wrong method
-    decoder, prior = sampler
+    decoder, grnn, prior = sampler
 
     # Sample x_t
-    x_t = (decoder * prior).sample(data)
+    sample = (decoder * grnn * prior).sample(data)
+    x_t = decoder.sample_mean({"h": sample["h"]})
 
     # Update h_t
+    data["h_prev"] = sample["h"]
+    data["u"] = x_t
 
-    latent_keys = ["z", "h_prev"]
-    update_key_dict = {"h_prev": "h"}
-
-    return data, latent_keys, update_key_dict
+    return x_t[None, :], data
